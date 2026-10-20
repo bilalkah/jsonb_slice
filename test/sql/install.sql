@@ -1,0 +1,33 @@
+CREATE EXTENSION jsonb_slice;
+
+COPY (
+    SELECT extname || ':' || extversion || ':' || extrelocatable
+    FROM pg_extension
+    WHERE extname = 'jsonb_slice'
+) TO STDOUT;
+
+COPY (
+    SELECT obj_description(oid, 'pg_extension') IS NOT NULL
+    FROM pg_extension
+    WHERE extname = 'jsonb_slice'
+) TO STDOUT;
+
+COPY (
+    SELECT NOT EXISTS (
+        SELECT 1
+        FROM pg_depend AS dependency
+        JOIN pg_extension AS extension
+          ON extension.oid = dependency.refobjid
+        WHERE dependency.refclassid = 'pg_extension'::regclass
+          AND dependency.deptype = 'e'
+          AND extension.extname = 'jsonb_slice'
+    )
+) TO STDOUT;
+
+DROP EXTENSION jsonb_slice;
+
+COPY (
+    SELECT count(*) = 0
+    FROM pg_extension
+    WHERE extname = 'jsonb_slice'
+) TO STDOUT;
