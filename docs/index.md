@@ -35,6 +35,7 @@ For each unsupported input, PostgreSQL must do the work.
 
 - a PGXS package that installs `jsonb_slice`;
 - a regression test for create, version, empty membership, and drop behavior;
+- a PostgreSQL-style C format configuration and CI check;
 - an explanation of the research question;
 - an explicit statement of the current limits;
 - a versioned documentation and Pages build.

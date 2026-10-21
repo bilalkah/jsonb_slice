@@ -10,6 +10,24 @@ permissions:
   contents: read
 
 jobs:
+  c-format:
+    name: Check C formatting
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out the source
+        uses: actions/checkout@v6
+
+      - name: Check the format configuration and C sources
+        shell: bash
+        run: |
+          clang-format-18 --style=file --dump-config > /dev/null
+          mapfile -d '' files < <(git ls-files -z -- '*.c' '*.h')
+          if (( ${#files[@]} == 0 )); then
+            echo "No C or header files in 0.1.0."
+            exit 0
+          fi
+          clang-format-18 --style=file --dry-run --Werror "${files[@]}"
+
   extension-shell:
     name: Test the extension shell
     runs-on: ubuntu-24.04
