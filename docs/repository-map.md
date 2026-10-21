@@ -11,13 +11,14 @@
 | `docs/` | Documentation for the current source version |
 | `landing/` | The page at `/jsonb_slice/` that lists all versions |
 | `scripts/` | Versioned documentation build |
-| `.github/workflows/` | Continuous checks and Pages deployment |
+| `.github/workflows/` | Continuous checks, release publishing, and Pages deployment |
 
 ## Version ownership
 
 Each source version contains its documentation. The Pages workflow builds the
 current version in its versioned path. Release tags keep published versions at
-the same address.
+the same address. The release workflow uses the same tag to build
+the source archive and the GitHub Release notes.
 
 For example:
 

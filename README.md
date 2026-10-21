@@ -19,7 +19,7 @@ The 0.1.0 checks cover the package identity, version, installation, and
 documentation build.
 
 Read the [versioned documentation](https://bilalkah.github.io/jsonb_slice/)
-or the [0.1.0 release notes](docs/releases/0.1.0.md).
+or the [0.1.0 release](https://github.com/bilalkah/jsonb_slice/releases/tag/v0.1.0).
 
 ## Repository map
 
@@ -33,7 +33,7 @@ or the [0.1.0 release notes](docs/releases/0.1.0.md).
 | `test/` | 0.1.0 package regression test |
 | `landing/` | Documentation version index |
 | `scripts/` | Versioned documentation build |
-| `.github/workflows/` | Documentation checks and GitHub Pages deployment |
+| `.github/workflows/` | Package checks, releases, and GitHub Pages deployment |
 
 ## Install 0.1.0
 
