@@ -7,27 +7,85 @@ COPY (
 ) TO STDOUT;
 
 COPY (
-    SELECT obj_description(oid, 'pg_extension') IS NOT NULL
-    FROM pg_extension
-    WHERE extname = 'jsonb_slice'
+    SELECT p.provolatile::text || ':' || p.proisstrict::text || ':' ||
+           p.proparallel::text
+    FROM pg_proc AS p
+    WHERE p.oid = 'jsonb_slice_get(jsonb,text)'::regprocedure
 ) TO STDOUT;
 
 COPY (
-    SELECT NOT EXISTS (
-        SELECT 1
-        FROM pg_depend AS dependency
-        JOIN pg_extension AS extension
-          ON extension.oid = dependency.refobjid
-        WHERE dependency.refclassid = 'pg_extension'::regclass
-          AND dependency.deptype = 'e'
-          AND extension.extname = 'jsonb_slice'
-    )
+    SELECT count(*)
+    FROM pg_depend AS dependency
+    JOIN pg_extension AS extension
+      ON extension.oid = dependency.refobjid
+    WHERE dependency.refclassid = 'pg_extension'::regclass
+      AND dependency.classid = 'pg_proc'::regclass
+      AND dependency.deptype = 'e'
+      AND extension.extname = 'jsonb_slice'
 ) TO STDOUT;
+
+COPY (
+    SELECT test_name || ':' ||
+           (jsonb_slice_get(document, field_name) IS NOT DISTINCT FROM
+            document -> field_name)
+    FROM (VALUES
+        ('string',       '{"field": "value"}'::jsonb,   'field'),
+        ('number',       '{"field": 42}'::jsonb,        'field'),
+        ('boolean',      '{"field": true}'::jsonb,      'field'),
+        ('json null',    '{"field": null}'::jsonb,      'field'),
+        ('object',       '{"field": {"n": 1}}'::jsonb, 'field'),
+        ('array',        '{"field": [1, 2]}'::jsonb,    'field'),
+        ('empty key',    '{"": "value"}'::jsonb,      ''),
+        ('missing key',  '{"field": 1}'::jsonb,         'missing'),
+        ('multibyte key', '{"ключ": "значение"}'::jsonb, 'ключ'),
+        ('array input',  '[1, 2]'::jsonb,                 'field'),
+        ('scalar input', '1'::jsonb,                      'field')
+    ) AS cases(test_name, document, field_name)
+    ORDER BY test_name
+) TO STDOUT;
+
+COPY (
+    SELECT jsonb_slice_get(NULL::jsonb, 'field') IS NULL AND
+           jsonb_slice_get('{"field": 1}'::jsonb, NULL::text) IS NULL
+) TO STDOUT;
+
+CREATE TABLE toasted_input (document jsonb);
+ALTER TABLE toasted_input ALTER COLUMN document SET STORAGE EXTERNAL;
+INSERT INTO toasted_input
+SELECT jsonb_build_object(
+    'field', jsonb_build_object('value', repeat('x', 8000)),
+    'padding', repeat('y', 8000)
+);
+
+COPY (
+    SELECT jsonb_slice_get(document, 'field') = document -> 'field'
+    FROM toasted_input
+) TO STDOUT;
+
+DROP TABLE toasted_input;
 
 DROP EXTENSION jsonb_slice;
 
 COPY (
-    SELECT count(*) = 0
+    SELECT to_regprocedure('jsonb_slice_get(jsonb,text)') IS NULL
+) TO STDOUT;
+
+CREATE EXTENSION jsonb_slice VERSION '0.1.0';
+
+COPY (
+    SELECT extversion || ':' ||
+           (to_regprocedure('jsonb_slice_get(jsonb,text)') IS NULL)
     FROM pg_extension
     WHERE extname = 'jsonb_slice'
 ) TO STDOUT;
+
+ALTER EXTENSION jsonb_slice UPDATE TO '0.2.0';
+
+COPY (
+    SELECT extversion || ':' ||
+           (jsonb_slice_get('{"field": "value"}'::jsonb, 'field') = '"value"'::jsonb)
+    FROM pg_extension
+    WHERE extname = 'jsonb_slice'
+) TO STDOUT;
+
+DROP EXTENSION jsonb_slice;
