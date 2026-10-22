@@ -70,7 +70,7 @@ jobs:
       - name: Install PostgreSQL build files
         run: |
           sudo apt-get update
-          sudo apt-get install --yes postgresql-server-dev-16
+          sudo apt-get install --yes clang-19 postgresql-server-dev-16
 
       - name: Start PostgreSQL
         run: |
