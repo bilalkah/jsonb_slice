@@ -1,0 +1,12 @@
+{
+  "current": "0.1.0",
+  "releases": [
+    {
+      "version": "0.1.0",
+      "sequence": 1,
+      "state": "ready",
+      "title": "Install the project shell",
+      "summary": "This release creates the extension identity and documents the problem, repository structure, and test boundary."
+    }
+  ]
+}
