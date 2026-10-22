@@ -23,35 +23,35 @@
     <section class="hero">
       <div class="hero-copy">
         <p class="eyebrow">PostgreSQL extension research</p>
-        <h1>One field.<br><em>Fewer bytes.</em></h1>
+        <h1>One field.<br><em>Clear semantics.</em></h1>
         <p class="lede">
-          jsonb_slice studies whether PostgreSQL can read one field from a
-          large <code>jsonb</code> value without reading the complete value.
+          Version 0.2.0 adds one C function that reads a top-level JSONB field
+          with the same result rules as PostgreSQL's text-key accessor.
         </p>
         <div class="actions">
           @@LATEST_ACTION@@
-          <a class="button secondary" href="#versions">See current version</a>
+          <a class="button secondary" href="#versions">See released versions</a>
         </div>
       </div>
 
-      <div class="read-path" aria-label="Contents of version 0.1.0">
-        <p class="diagram-label">0.1.0 package shell</p>
+      <div class="read-path" aria-label="Read path in version 0.2.0">
+        <p class="diagram-label">0.2.0 accessor path</p>
         <ol>
-          <li><span>01</span><strong>Control</strong><small>Extension identity</small></li>
-          <li><span>02</span><strong>SQL</strong><small>Versioned install</small></li>
-          <li><span>03</span><strong>PGXS</strong><small>Build and install</small></li>
-          <li><span>04</span><strong>Test</strong><small>Create and drop</small></li>
+          <li><span>01</span><strong>Call</strong><small>JSONB and field name</small></li>
+          <li><span>02</span><strong>Detoast</strong><small>Complete input value</small></li>
+          <li><span>03</span><strong>Lookup</strong><small>Top-level object directory</small></li>
+          <li><span>04</span><strong>Return</strong><small>JSONB field value</small></li>
         </ol>
       </div>
     </section>
 
     <section class="premise" aria-labelledby="premise-title">
-      <p class="section-number">01 / Premise</p>
+      <p class="section-number">01 / Current release</p>
       <div>
-        <h2 id="premise-title">Version 0.1.0 establishes the project boundary.</h2>
+        <h2 id="premise-title">Version 0.2.0 establishes the accessor result.</h2>
         <p>
-          The package installs and removes the extension identity. It has no
-          JSONB accessor, shared library, or performance claim.
+          The function handles every JSONB field value type. It reads the
+          complete input and makes no performance claim.
         </p>
       </div>
     </section>
@@ -74,8 +74,8 @@
       <div>
         <h2 id="notice-title">An experiment, not a production promise.</h2>
         <p>
-          Version 0.1.0 does not guarantee a stable API or on-disk format. Its
-          release notes state what is tested and what is not.
+          Version 0.2.0 does not reduce TOAST reads. Its release notes state
+          what the function does and what it does not do.
         </p>
       </div>
     </section>
