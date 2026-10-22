@@ -9,7 +9,7 @@ IndentWidth: 4
 ContinuationIndentWidth: 4
 ColumnLimit: 79
 BreakBeforeBraces: Allman
-BreakAfterReturnType: AllDefinitions
+AlwaysBreakAfterReturnType: AllDefinitions
 AllowShortBlocksOnASingleLine: Never
 AllowShortCaseLabelsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: None
