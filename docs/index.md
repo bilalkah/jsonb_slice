@@ -38,7 +38,8 @@ For each unsupported input, PostgreSQL must do the work.
 - a PostgreSQL-style C format configuration and CI check;
 - an explanation of the research question;
 - an explicit statement of the current limits;
-- a versioned documentation and Pages build.
+- a versioned documentation and Pages build;
+- a tagged source archive with a SHA-256 checksum.
 
 ## What 0.1.0 does not contain
 
