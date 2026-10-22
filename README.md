@@ -25,6 +25,7 @@ or the [0.1.0 release notes](docs/releases/0.1.0.md).
 
 | Path | Purpose in this release |
 |---|---|
+| `.clang-format` | PostgreSQL-style C layout for editors and CI |
 | `Makefile` | PostgreSQL extension build and regression entry point |
 | `jsonb_slice.control` | Extension identity and default version |
 | `sql/` | Versioned 0.1.0 installation script |

@@ -1,0 +1,25 @@
+# PostgreSQL core uses pgindent, not clang-format. This profile follows the
+# documented PostgreSQL layout rules for editor feedback and CI checks.
+---
+Language: Cpp
+BasedOnStyle: LLVM
+UseTab: Always
+TabWidth: 4
+IndentWidth: 4
+ContinuationIndentWidth: 4
+ColumnLimit: 79
+BreakBeforeBraces: Allman
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+BreakStringLiterals: false
+DerivePointerAlignment: false
+PointerAlignment: Right
+IndentCaseLabels: false
+IndentPPDirectives: None
+ReflowComments: false
+SortIncludes: Never
+SpaceBeforeParens: ControlStatements
+...
