@@ -23,13 +23,13 @@ jobs:
           clang-format-18 --style=file --dump-config > /dev/null
           mapfile -d '' files < <(git ls-files -z -- '*.c' '*.h')
           if (( ${#files[@]} == 0 )); then
-            echo "No C or header files in 0.1.0."
+            echo "No C or header files are tracked."
             exit 0
           fi
           clang-format-18 --style=file --dry-run --Werror "${files[@]}"
 
-  extension-shell:
-    name: Test the extension shell
+  extension:
+    name: Test the extension
     runs-on: ubuntu-24.04
     env:
       PG_CONFIG: /usr/lib/postgresql/16/bin/pg_config
@@ -47,7 +47,7 @@ jobs:
           sudo systemctl start postgresql
           sudo -u postgres createuser --superuser "$USER"
 
-      - name: Build and install the extension shell
+      - name: Build and install the extension
         run: |
           make
           sudo env PG_CONFIG="$PG_CONFIG" make install

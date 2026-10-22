@@ -1,4 +1,7 @@
 EXTENSION = jsonb_slice
+MODULE_big = jsonb_slice
+OBJS = src/jsonb_slice.o
+
 DATA = sql/jsonb_slice--0.1.0.sql
 
 REGRESS = install
