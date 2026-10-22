@@ -1,0 +1,3 @@
+comment = 'Study partial reads of large jsonb values'
+default_version = '0.1.0'
+relocatable = true
