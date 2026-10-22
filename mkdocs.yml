@@ -25,12 +25,12 @@ theme:
     - search.suggest
   palette:
     - media: "(prefers-color-scheme: light)"
-      scheme: jsonb-light
+      scheme: default
       toggle:
         icon: material/weather-night
         name: Use dark colors
     - media: "(prefers-color-scheme: dark)"
-      scheme: jsonb-dark
+      scheme: slate
       toggle:
         icon: material/weather-sunny
         name: Use light colors
