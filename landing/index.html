@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Versioned documentation for the jsonb_slice PostgreSQL extension experiment.">
+  <link rel="canonical" href="https://bilalkah.github.io/jsonb_slice/">
+  <link rel="stylesheet" href="./styles.css">
+  <title>jsonb_slice — PostgreSQL extension experiment</title>
+</head>
+<body>
+  <header class="topbar">
+    <a class="wordmark" href="./" aria-label="jsonb_slice documentation home">
+      <span aria-hidden="true">{ }</span> jsonb_slice
+    </a>
+    <nav aria-label="Project links">
+      <a href="#versions">Versions</a>
+      <a href="https://github.com/bilalkah/jsonb_slice">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">PostgreSQL extension research</p>
+        <h1>One field.<br><em>Fewer bytes.</em></h1>
+        <p class="lede">
+          jsonb_slice studies whether PostgreSQL can read one field from a
+          large <code>jsonb</code> value without reading the complete value.
+        </p>
+        <div class="actions">
+          @@LATEST_ACTION@@
+          <a class="button secondary" href="#versions">See current version</a>
+        </div>
+      </div>
+
+      <div class="read-path" aria-label="Contents of version 0.1.0">
+        <p class="diagram-label">0.1.0 package shell</p>
+        <ol>
+          <li><span>01</span><strong>Control</strong><small>Extension identity</small></li>
+          <li><span>02</span><strong>SQL</strong><small>Versioned install</small></li>
+          <li><span>03</span><strong>PGXS</strong><small>Build and install</small></li>
+          <li><span>04</span><strong>Test</strong><small>Create and drop</small></li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="premise" aria-labelledby="premise-title">
+      <p class="section-number">01 / Premise</p>
+      <div>
+        <h2 id="premise-title">Version 0.1.0 establishes the project boundary.</h2>
+        <p>
+          The package installs and removes the extension identity. It has no
+          JSONB accessor, shared library, or performance claim.
+        </p>
+      </div>
+    </section>
+
+    <section class="versions" id="versions" aria-labelledby="versions-title">
+      <div class="section-head">
+        <p class="section-number">02 / Versions</p>
+        <div>
+          <h2 id="versions-title">Documentation by version.</h2>
+          <p>Published documentation stays at its versioned address.</p>
+        </div>
+      </div>
+      <div class="release-list">
+        @@VERSION_ROWS@@
+      </div>
+    </section>
+
+    <section class="notice" aria-labelledby="notice-title">
+      <p class="section-number">03 / Boundary</p>
+      <div>
+        <h2 id="notice-title">An experiment, not a production promise.</h2>
+        <p>
+          Version 0.1.0 does not guarantee a stable API or on-disk format. Its
+          release notes state what is tested and what is not.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Bilal Kahraman · PostgreSQL License</p>
+    <p>Documentation index built from the release tags.</p>
+  </footer>
+</body>
+</html>
