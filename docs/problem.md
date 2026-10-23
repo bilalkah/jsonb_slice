@@ -8,41 +8,29 @@ small pointer to those chunks.
 
 ## A normal field read
 
-PostgreSQL's `jsonb` operators work on the `jsonb` value. For a large value,
-the database first restores the value from TOAST. If the value is compressed,
-the database also decompresses it. The operator can then find the requested
-field.
-
-This behavior is general and correct. Its cost can be high when the query
-needs a small field from a large document.
+PostgreSQL's JSONB operators work on an in-memory JSONB value. PostgreSQL
+restores a large value from TOAST before an operator reads it. PostgreSQL also
+decompresses a compressed value.
 
 ```text
-table row -> TOAST pointer -> all stored chunks -> complete jsonb -> one field
+table row -> all TOAST chunks -> complete jsonb -> one field
 ```
 
-## The research question
+This behavior is general and correct. Its cost can be high when a query needs
+one small field from a large document.
 
-An uncompressed `jsonb` value has a binary directory before its data. The
-directory describes the positions of its keys and values. A reader can use
-that directory to find the byte range of one value.
+## The 0.2.0 read
 
-The project asks whether a reader can use this path:
+0.2.0 establishes the accessor result. The function detoasts the complete
+input and uses PostgreSQL's JSONB container lookup helper.
 
 ```text
-table row -> TOAST pointer -> directory chunks -> value chunks -> one field
+jsonb input -> complete in-memory value -> object directory -> one field
 ```
 
-Version 0.1.0 does not implement this path. It contains the installable
-extension shell and documents the question.
+The test compares every supported result with PostgreSQL's `->` operator.
 
-## The trade-off
+## Current result
 
-Uncompressed storage can make a partial read possible. It also uses more disk
-space and can write more data during an update. A complete evaluation must
-account for three costs:
-
-- read time and bytes read;
-- table and index size;
-- update time and write-ahead log volume.
-
-Version 0.1.0 contains no benchmark result or performance claim.
+0.2.0 proves the function boundary, C library, JSONB lookup, package upgrade,
+and result rules. It contains no partial-read or performance claim.

@@ -1,18 +1,20 @@
-# Install 0.1.0
+# Install 0.2.0
 
-0.1.0 is an installable PostgreSQL extension shell. It records the project
-name and version in PostgreSQL. It does not read JSONB values.
+0.2.0 is a PostgreSQL C extension. It provides one function:
+`jsonb_slice_get(jsonb, text)`.
 
 ## Requirements
 
 You need:
 
 - PostgreSQL with its development files;
+- a C compiler;
 - GNU Make;
-- permission to install files in the PostgreSQL extension directory;
+- permission to install files in the PostgreSQL extension directories;
 - a test database where you can create an extension.
 
-`pg_config` must refer to the PostgreSQL installation that loads the extension.
+`pg_config` must refer to the PostgreSQL installation that loads the
+extension.
 
 ## Build and install
 
@@ -37,10 +39,38 @@ FROM pg_extension
 WHERE extname = 'jsonb_slice';
 ```
 
-The version must be `0.1.0`. The extension is relocatable because
-0.1.0 creates no schema objects.
+The version must be `0.2.0`. The extension is relocatable.
 
-## Run the package test
+## Upgrade from 0.1.0
+
+Install the 0.2.0 files. Then run:
+
+```sql
+ALTER EXTENSION jsonb_slice UPDATE TO '0.2.0';
+```
+
+The upgrade adds the accessor and keeps the extension identity.
+
+## Read one field
+
+```sql
+SELECT jsonb_slice_get(
+    '{"name": "Ada", "active": true}'::jsonb,
+    'name'
+);
+```
+
+The result is the JSONB string `"Ada"`.
+
+The function has these rules:
+
+- a stored field returns the same JSONB value as `document -> field_name`;
+- a missing field returns SQL `NULL`;
+- an array or scalar input returns SQL `NULL`;
+- a stored JSON `null` returns JSONB `null`;
+- a SQL `NULL` argument returns SQL `NULL`.
+
+## Run the regression test
 
 The PostgreSQL server must be running. The current operating-system user must
 be able to create an extension in the test database.
@@ -49,9 +79,10 @@ be able to create an extension in the test database.
 make installcheck PG_CONFIG=/path/to/pg_config
 ```
 
-The test creates the extension, checks its metadata, and drops it.
+The test checks a fresh installation, the accessor rules, extension removal,
+and an upgrade from 0.1.0.
 
 ## Current boundary
 
-0.1.0 creates no functions or operators. A successful installation does not
-change a query plan or JSONB result.
+0.2.0 detoasts the complete JSONB value before it reads the object directory.
+It does not reduce TOAST reads and makes no performance claim.

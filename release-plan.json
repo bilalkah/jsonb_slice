@@ -1,5 +1,5 @@
 {
-  "current": "0.1.0",
+  "current": "0.2.0",
   "releases": [
     {
       "version": "0.1.0",
@@ -7,6 +7,13 @@
       "state": "released",
       "title": "Install the project shell",
       "summary": "This release creates the extension identity and documents the problem, repository structure, and test boundary."
+    },
+    {
+      "version": "0.2.0",
+      "sequence": 2,
+      "state": "released",
+      "title": "Add the first JSONB accessor",
+      "summary": "This release reads one top-level object field after PostgreSQL detoasts the complete JSONB value."
     }
   ]
 }

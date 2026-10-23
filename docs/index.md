@@ -1,58 +1,55 @@
-# Read one field, not the complete document
+# Read one top-level field
 
-<span class="release-mark">0.1.0 · research definition</span>
+<span class="release-mark">0.2.0 · first JSONB accessor</span>
 
-`jsonb_slice` is a PostgreSQL extension experiment. It studies partial reads
-of large `jsonb` values. The test case is simple: a query needs one small
-field, but the stored document is large.
+`jsonb_slice` is a PostgreSQL extension experiment. Version 0.2.0 provides
+`jsonb_slice_get(jsonb, text)`. The function reads one top-level object field
+and returns the same JSONB value as PostgreSQL's `->` operator with a text key.
 
-Version 0.1.0 describes the experiment and installs the extension shell. It
-does not provide a JSONB accessor.
+This version reads the complete input into memory before it looks for the
+field. It does not perform a partial TOAST read.
 
 <div class="doc-grid" markdown>
 
 <div class="doc-card" markdown>
 
-## Question
+## Input
 
-Can an extension find one field in an uncompressed, out-of-line `jsonb` value
-and fetch only the TOAST chunks that hold the answer?
+The first argument is a JSONB value. The second argument is a top-level object
+field name.
 
 </div>
 
 <div class="doc-card" markdown>
 
-## Required result
+## Result
 
-For each supported input, the result must equal the result from PostgreSQL.
-For each unsupported input, PostgreSQL must do the work.
-
-</div>
+The result matches `document -> field_name`. This rule includes missing fields,
+JSON null, containers, arrays, scalars, and SQL null arguments.
 
 </div>
 
-## What 0.1.0 contains
+</div>
 
-- a PGXS package that installs `jsonb_slice`;
-- a regression test for create, version, empty membership, and drop behavior;
-- a PostgreSQL-style C format configuration and CI check;
-- an explanation of the research question;
-- an explicit statement of the current limits;
-- a versioned documentation and Pages build;
-- a tagged source archive with a SHA-256 checksum.
+## What 0.2.0 contains
 
-## What 0.1.0 does not contain
+- a PostgreSQL shared library written in C;
+- one top-level object accessor;
+- fresh-install and 0.1.0 upgrade scripts;
+- a regression test for metadata and accessor results;
+- versioned documentation and release automation.
 
-- C source;
-- SQL functions or operators;
+## What 0.2.0 does not contain
+
+- partial TOAST reads;
+- text, array-index, or path accessors;
+- operators or planner hooks;
 - benchmark results;
 - a production support promise.
 
-These omissions define the current release. They are not hidden features.
-
 !!! warning "Experimental work"
-    Install this version only in a test database. It creates the extension
-    identity but does not change JSONB query behavior.
+    Install this version only in a test database. It reads the complete JSONB
+    value and makes no performance claim.
 
-[Install 0.1.0](getting-started.md){ .md-button .md-button--primary }
+[Install 0.2.0](getting-started.md){ .md-button .md-button--primary }
 [Read the problem](problem.md){ .md-button .md-button--primary }

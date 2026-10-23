@@ -79,11 +79,12 @@ extra:
 
 nav:
   - Start: index.md
-  - Install 0.1.0: getting-started.md
+  - Install 0.2.0: getting-started.md
   - The experiment:
       - Problem: problem.md
   - Project:
       - Repository map: repository-map.md
       - Terms: terms.md
   - Releases:
+      - 0.2.0: releases/0.2.0.md
       - 0.1.0: releases/0.1.0.md
