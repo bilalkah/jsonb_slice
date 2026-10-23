@@ -1,3 +1,4 @@
 comment = 'Study partial reads of large jsonb values'
-default_version = '0.1.0'
+default_version = '0.2.0'
+module_pathname = '$libdir/jsonb_slice'
 relocatable = true
