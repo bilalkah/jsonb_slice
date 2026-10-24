@@ -6,9 +6,14 @@
 - the C function's volatility, strictness, and parallel-safety flags;
 - ownership of the function by the extension;
 - results for each JSONB value type;
+- false, negative, decimal, large numeric, and empty-string values;
 - missing, empty, and multibyte field names;
 - non-object and SQL null inputs;
 - sliced reads from an external, uncompressed table value;
+- binary-search results at the first, middle, and last key;
+- JSONB length-first key ordering;
+- JEntry offsets before and after an offset stride;
+- external array and scalar roots;
 - proof that the requested slice lengths total less than the complete value;
 - complete-value fallback for inline and compressed values;
 - removal of the function by `DROP EXTENSION`;

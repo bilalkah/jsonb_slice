@@ -61,8 +61,13 @@ SELECT jsonb_build_object(
 	'', 'empty key',
 	'array', jsonb_build_array(1, 2),
 	'boolean', true,
+	'boolean false', false,
+	'decimal', 12345.6789,
+	'empty string', '',
 	'json null', NULL,
+	'large number', 123456789012345678901234567890.123456789::numeric,
 	'multibyte', 'çğıöşü 日本語',
+	'negative', -42,
 	'number', 42,
 	'object', jsonb_build_object('value', 1),
 	'string', 'value',
@@ -79,11 +84,16 @@ COPY (
 	CROSS JOIN (VALUES
 		('array', 'array'),
 		('boolean', 'boolean'),
+		('boolean false', 'boolean false'),
+		('decimal', 'decimal'),
 		('empty key', ''),
+		('empty string', 'empty string'),
 		('json null', 'json null'),
+		('large number', 'large number'),
 		('missing key', 'missing'),
 		('multibyte key', 'ключ'),
 		('multibyte value', 'multibyte'),
+		('negative', 'negative'),
 		('number', 'number'),
 		('object', 'object'),
 		('string', 'string')
@@ -98,6 +108,117 @@ COPY (
 ) TO STDOUT;
 
 DROP TABLE toasted_input;
+
+CREATE TABLE search_input (document jsonb);
+ALTER TABLE search_input ALTER COLUMN document SET STORAGE EXTERNAL;
+INSERT INTO search_input
+SELECT jsonb_build_object(
+	'a', 'first',
+	'z', 'short key',
+	'aa', 'longer key',
+	'mm', 'middle left',
+	'zz', 'middle',
+	'large a', repeat('x', 12000),
+	'large b', repeat('y', 12000),
+	'zzzzzzzzzz', 'last'
+);
+
+COPY (
+	SELECT test_name || ':' ||
+		   (jsonb_slice_get(document, field_name) IS NOT DISTINCT FROM
+			document -> field_name)
+	FROM search_input
+	CROSS JOIN (VALUES
+		('first key', 'a'),
+		('last key', 'zzzzzzzzzz'),
+		('length ordering', 'z'),
+		('longer key', 'aa'),
+		('middle key', 'zz'),
+		('missing key', 'missing')
+	) AS cases(test_name, field_name)
+	ORDER BY test_name
+) TO STDOUT;
+
+COPY (
+	SELECT jsonb_slice_get(document, 'a') = document -> 'a'
+	FROM search_input
+) TO STDOUT;
+
+COPY (
+	SELECT jsonb_slice_test_fetched_bytes() > 0 AND
+		   jsonb_slice_test_fetched_bytes() < pg_column_size(document)
+	FROM search_input
+) TO STDOUT;
+
+COPY (
+	SELECT jsonb_slice_get(document, 'zzzzzzzzzz') =
+		   document -> 'zzzzzzzzzz'
+	FROM search_input
+) TO STDOUT;
+
+COPY (
+	SELECT jsonb_slice_test_fetched_bytes() > 0 AND
+		   jsonb_slice_test_fetched_bytes() < pg_column_size(document)
+	FROM search_input
+) TO STDOUT;
+
+DROP TABLE search_input;
+
+CREATE TABLE stride_input (document jsonb);
+ALTER TABLE stride_input ALTER COLUMN document SET STORAGE EXTERNAL;
+INSERT INTO stride_input
+SELECT jsonb_object_agg('k' || lpad(number::text, 2, '0'), number) ||
+	   jsonb_build_object('padding', repeat('p', 24000))
+FROM generate_series(0, 39) AS numbers(number);
+
+COPY (
+	SELECT test_name || ':' ||
+		   (jsonb_slice_get(document, field_name) IS NOT DISTINCT FROM
+			document -> field_name)
+	FROM stride_input
+	CROSS JOIN (VALUES
+		('after offset stride', 'k32'),
+		('before offset stride', 'k31'),
+		('first key', 'k00'),
+		('last key', 'k39')
+	) AS cases(test_name, field_name)
+	ORDER BY test_name
+) TO STDOUT;
+
+COPY (
+	SELECT jsonb_slice_test_fetched_bytes() > 0 AND
+		   jsonb_slice_test_fetched_bytes() < pg_column_size(document)
+	FROM stride_input
+) TO STDOUT;
+
+DROP TABLE stride_input;
+
+CREATE TABLE external_non_object_input (test_name text, document jsonb);
+ALTER TABLE external_non_object_input
+	ALTER COLUMN document SET STORAGE EXTERNAL;
+INSERT INTO external_non_object_input VALUES
+	('array', jsonb_build_array(repeat('a', 24000))),
+	('scalar', to_jsonb(repeat('s', 24000)::text));
+
+COPY (
+	SELECT test_name || ':' ||
+		   (jsonb_slice_get(document, 'field') IS NOT DISTINCT FROM
+			document -> 'field')
+	FROM external_non_object_input
+	ORDER BY test_name
+) TO STDOUT;
+
+COPY (
+	SELECT jsonb_slice_get(document, 'field') IS NULL
+	FROM external_non_object_input
+	WHERE test_name = 'scalar'
+) TO STDOUT;
+
+COPY (
+	SELECT jsonb_slice_test_fetched_bytes() = 4
+) TO STDOUT;
+
+DROP TABLE external_non_object_input;
 
 COPY (
 	SELECT jsonb_slice_get('{"field": 1}'::jsonb, 'field') = '1'::jsonb
