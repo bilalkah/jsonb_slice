@@ -4,6 +4,24 @@
  * Read one top-level object field from an external, uncompressed jsonb value.
  * Slice only an uncompressed value stored in a TOAST table. Inline data is
  * already in the row, and compressed data needs complete decompression.
+ *
+ * Slice offsets start at the logical JSONB data, after the outer varlena
+ * header. A root object with N key-value pairs has this layout:
+ *
+ *   logical offset 0
+ *   +------------------------------------+
+ *   | container header                   | type and pair count
+ *   +------------------------------------+
+ *   | key JEntries   [0 .. N - 1]        | type and length/end offset
+ *   | value JEntries [N .. 2 * N - 1]    | type and length/end offset
+ *   +------------------------------------+
+ *   | all key bytes                      |
+ *   | all value bytes                    | padding before some values
+ *   +------------------------------------+
+ *
+ * JEntry positions are relative to the data area after the directory. Null
+ * and Boolean values have no data bytes. Compressed TOAST bytes do not keep
+ * these logical positions, so compressed input uses the complete-value path.
  */
 #include "postgres.h"
 
@@ -307,14 +325,16 @@ slice_lookup(SliceSource *source, const char *key, uint32 key_length,
 		return false;
 	data_length = (uint32)(source->total - data_start);
 
+	/* Request only directory metadata, not key or value payloads. */
 	directory_slice =
 		slice_fetch(source, JSONB_CONTAINER_HEADER_SIZE, directory_length);
 	if (directory_slice == NULL)
 		return false;
 	entries = (const JEntry *)VARDATA_ANY(directory_slice);
+	/* Index count is the first value entry; its offset ends the key area. */
 	if (!entry_offset(entries, count, &keys_end) || keys_end > data_length)
 		goto done;
-	/* Keys come first, so we can search them without reading any value bytes. */
+	/* JEntries describe keys; fetch their actual bytes for key comparison. */
 	if (keys_end > 0)
 	{
 		keys_slice = slice_fetch(source, data_start, keys_end);

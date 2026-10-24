@@ -82,6 +82,7 @@ nav:
   - Install 0.3.0: getting-started.md
   - The experiment:
       - Problem: problem.md
+      - JSONB object layout: jsonb-layout.md
   - Project:
       - Repository map: repository-map.md
       - Terms: terms.md
