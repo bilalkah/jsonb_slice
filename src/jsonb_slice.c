@@ -285,12 +285,16 @@ slice_lookup(SliceSource *source, const char *key, uint32 key_length,
 	memcpy(&header, VARDATA_ANY(header_slice), sizeof(uint32));
 	pfree(header_slice);
 
+	/* A valid non-object has no named field, so report a clean miss. */
 	if ((header & JB_FOBJECT) == 0)
 		return (header & JB_FARRAY) != 0;
+	/* Conflicting container flags make the metadata unsafe to parse. */
 	if (header & (JB_FARRAY | JB_FSCALAR))
 		return false;
 
+	/* The low header bits contain the number of object key-value pairs. */
 	count = header & JB_CMASK;
+	/* An empty object is valid but cannot contain the requested field. */
 	if (count == 0)
 		return true;
 	/* We need one key entry and one value entry for every object pair. */
