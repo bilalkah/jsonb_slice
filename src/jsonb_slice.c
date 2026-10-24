@@ -23,6 +23,9 @@ PG_MODULE_MAGIC;
 PG_FUNCTION_INFO_V1(jsonb_slice_get);
 PG_FUNCTION_INFO_V1(jsonb_slice_test_fetched_bytes);
 
+/* A JSONB container starts with one uint32 that stores its type and count. */
+#define JSONB_CONTAINER_HEADER_SIZE ((int32)sizeof(uint32))
+
 /* Last successful sliced call in this backend; exposed only to the tests. */
 static int64 last_fetched_bytes = -1;
 
@@ -139,7 +142,7 @@ locate_value(JEntry entry, int64 data_start, uint32 offset, uint32 length,
 		location->start = (int32)(data_start + offset + padding);
 		location->length = (int32)(length - padding);
 		if (type == JENTRY_ISCONTAINER &&
-			location->length < (int32)sizeof(uint32))
+			location->length < JSONB_CONTAINER_HEADER_SIZE)
 			return false;
 		break;
 	case JENTRY_ISNULL:
@@ -279,10 +282,10 @@ slice_lookup(SliceSource *source, const char *key, uint32 key_length,
 
 	*found = false;
 	/* Read the root header first; it gives the type and object pair count. */
-	header_slice = slice_fetch(source, 0, sizeof(uint32));
+	header_slice = slice_fetch(source, 0, JSONB_CONTAINER_HEADER_SIZE);
 	if (header_slice == NULL)
 		return false;
-	memcpy(&header, VARDATA_ANY(header_slice), sizeof(uint32));
+	memcpy(&header, VARDATA_ANY(header_slice), JSONB_CONTAINER_HEADER_SIZE);
 	pfree(header_slice);
 
 	/* A valid non-object has no named field, so report a clean miss. */
@@ -299,12 +302,13 @@ slice_lookup(SliceSource *source, const char *key, uint32 key_length,
 		return true;
 	/* We need one key entry and one value entry for every object pair. */
 	directory_length = 2 * (uint64)count * sizeof(JEntry);
-	data_start = sizeof(uint32) + directory_length;
+	data_start = JSONB_CONTAINER_HEADER_SIZE + directory_length;
 	if (directory_length > INT_MAX || data_start > source->total)
 		return false;
 	data_length = (uint32)(source->total - data_start);
 
-	directory_slice = slice_fetch(source, sizeof(uint32), directory_length);
+	directory_slice =
+		slice_fetch(source, JSONB_CONTAINER_HEADER_SIZE, directory_length);
 	if (directory_slice == NULL)
 		return false;
 	entries = (const JEntry *)VARDATA_ANY(directory_slice);
@@ -432,7 +436,7 @@ jsonb_slice_get(PG_FUNCTION_ARGS)
 	source.total = VARATT_EXTERNAL_GET_EXTSIZE(toast_pointer);
 	source.fetched_bytes = 0;
 	/* A JSONB root needs at least its four-byte container header. */
-	if (source.total < (int32)sizeof(uint32))
+	if (source.total < JSONB_CONTAINER_HEADER_SIZE)
 		return full_lookup(fcinfo);
 
 	field_name = PG_GETARG_TEXT_PP(1);
