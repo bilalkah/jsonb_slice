@@ -148,4 +148,13 @@ COPY (
     WHERE extname = 'jsonb_slice'
 ) TO STDOUT;
 
+ALTER EXTENSION jsonb_slice UPDATE TO '0.3.0';
+
+COPY (
+    SELECT extversion || ':' ||
+           (jsonb_slice_get('{"field": "value"}'::jsonb, 'field') = '"value"'::jsonb)
+    FROM pg_extension
+    WHERE extname = 'jsonb_slice'
+) TO STDOUT;
+
 DROP EXTENSION jsonb_slice;

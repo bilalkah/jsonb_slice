@@ -8,7 +8,7 @@ COPY (
     FROM pg_extension
     WHERE extname = 'jsonb_slice'
 ) TO STDOUT;
-jsonb_slice:0.2.0:true
+jsonb_slice:0.3.0:true
 COPY (
     SELECT p.provolatile::text || ':' || p.proisstrict::text || ':' ||
            p.proparallel::text
@@ -158,4 +158,12 @@ COPY (
     WHERE extname = 'jsonb_slice'
 ) TO STDOUT;
 0.2.0:true
+ALTER EXTENSION jsonb_slice UPDATE TO '0.3.0';
+COPY (
+    SELECT extversion || ':' ||
+           (jsonb_slice_get('{"field": "value"}'::jsonb, 'field') = '"value"'::jsonb)
+    FROM pg_extension
+    WHERE extname = 'jsonb_slice'
+) TO STDOUT;
+0.3.0:true
 DROP EXTENSION jsonb_slice;

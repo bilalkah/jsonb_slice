@@ -5,7 +5,9 @@ OBJS = src/jsonb_slice.o
 DATA = \
 	sql/jsonb_slice--0.1.0.sql \
 	sql/jsonb_slice--0.2.0.sql \
-	sql/jsonb_slice--0.1.0--0.2.0.sql
+	sql/jsonb_slice--0.3.0.sql \
+	sql/jsonb_slice--0.1.0--0.2.0.sql \
+	sql/jsonb_slice--0.2.0--0.3.0.sql
 
 REGRESS = install
 REGRESS_OPTS = --inputdir=test
