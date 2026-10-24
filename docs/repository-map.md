@@ -12,7 +12,7 @@
 | `docs/` | Documentation for the current source version |
 | `landing/` | The page at `/jsonb_slice/` that lists released versions |
 | `scripts/` | Versioned documentation build |
-| `.github/workflows/` | Continuous checks and GitHub Release publication |
+| `.github/workflows/` | Continuous checks, GitHub Releases, and Pages deployment |
 
 ## Version ownership
 

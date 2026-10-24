@@ -18,7 +18,7 @@
     {
       "version": "0.3.0",
       "sequence": 3,
-      "state": "ready",
+      "state": "released",
       "title": "Read selected JSONB data through TOAST slices",
       "summary": "This release reads the root directory, object keys, and selected value through TOAST slices when the input is external and uncompressed."
     }

@@ -36,7 +36,7 @@ or the [0.3.0 release](https://github.com/bilalkah/jsonb_slice/releases/tag/v0.3
 | `test/` | Installation, accessor, removal, and upgrade regression test |
 | `landing/` | Documentation version index |
 | `scripts/` | Versioned documentation build |
-| `.github/workflows/` | Package checks and GitHub Release publication |
+| `.github/workflows/` | Package checks, GitHub Releases, and Pages deployment |
 
 ## Install 0.3.0
 
