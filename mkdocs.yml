@@ -1,7 +1,7 @@
 site_name: jsonb_slice
 site_description: >-
-  A PostgreSQL extension experiment that reads one field from a large jsonb
-  value without reading the complete value.
+  A PostgreSQL extension experiment that can read selected parts of an
+  external, uncompressed JSONB value.
 site_author: Bilal Kahraman
 site_url: !ENV [JSONB_SLICE_SITE_URL, "http://127.0.0.1:8000/"]
 repo_url: https://github.com/bilalkah/jsonb_slice
@@ -79,12 +79,13 @@ extra:
 
 nav:
   - Start: index.md
-  - Install 0.2.0: getting-started.md
+  - Install 0.3.0: getting-started.md
   - The experiment:
       - Problem: problem.md
   - Project:
       - Repository map: repository-map.md
       - Terms: terms.md
   - Releases:
+      - 0.3.0: releases/0.3.0.md
       - 0.2.0: releases/0.2.0.md
       - 0.1.0: releases/0.1.0.md

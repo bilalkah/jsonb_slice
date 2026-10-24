@@ -1,6 +1,6 @@
-# Install 0.2.0
+# Install 0.3.0
 
-0.2.0 is a PostgreSQL C extension. It provides one function:
+0.3.0 is a PostgreSQL C extension. It provides one function:
 `jsonb_slice_get(jsonb, text)`.
 
 ## Requirements
@@ -39,17 +39,17 @@ FROM pg_extension
 WHERE extname = 'jsonb_slice';
 ```
 
-The version must be `0.2.0`. The extension is relocatable.
+The version must be `0.3.0`. The extension is relocatable.
 
-## Upgrade from 0.1.0
+## Upgrade from 0.2.0
 
-Install the 0.2.0 files. Then run:
+Install the 0.3.0 files. Then run:
 
 ```sql
-ALTER EXTENSION jsonb_slice UPDATE TO '0.2.0';
+ALTER EXTENSION jsonb_slice UPDATE TO '0.3.0';
 ```
 
-The upgrade adds the accessor and keeps the extension identity.
+The upgrade keeps the function signature and changes its read path.
 
 ## Read one field
 
@@ -79,10 +79,12 @@ be able to create an extension in the test database.
 make installcheck PG_CONFIG=/path/to/pg_config
 ```
 
-The test checks a fresh installation, the accessor rules, extension removal,
-and an upgrade from 0.1.0.
+The test checks a fresh installation, the accessor rules, the storage paths,
+extension removal, and upgrades from 0.1.0 through 0.3.0.
 
 ## Current boundary
 
-0.2.0 detoasts the complete JSONB value before it reads the object directory.
-It does not reduce TOAST reads and makes no performance claim.
+0.3.0 uses TOAST slices for an external, uncompressed JSONB value. It reads
+the root directory, all top-level keys, and the selected field value. It uses
+the normal complete-value lookup for inline or compressed input. This release
+makes no performance claim.

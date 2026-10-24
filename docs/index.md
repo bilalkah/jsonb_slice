@@ -1,13 +1,14 @@
-# Read one top-level field
+# Read one field with TOAST slices
 
-<span class="release-mark">0.2.0 · first JSONB accessor</span>
+<span class="release-mark">0.3.0 · partial read path</span>
 
-`jsonb_slice` is a PostgreSQL extension experiment. Version 0.2.0 provides
+`jsonb_slice` is a PostgreSQL extension experiment. Version 0.3.0 provides
 `jsonb_slice_get(jsonb, text)`. The function reads one top-level object field
 and returns the same JSONB value as PostgreSQL's `->` operator with a text key.
 
-This version reads the complete input into memory before it looks for the
-field. It does not perform a partial TOAST read.
+The function uses TOAST slices when the input is external and uncompressed.
+It reads the root directory, the object keys, and the selected value. The
+function uses PostgreSQL's normal complete-value path for other storage forms.
 
 <div class="doc-grid" markdown>
 
@@ -31,25 +32,26 @@ JSON null, containers, arrays, scalars, and SQL null arguments.
 
 </div>
 
-## What 0.2.0 contains
+## What 0.3.0 contains
 
 - a PostgreSQL shared library written in C;
 - one top-level object accessor;
-- fresh-install and 0.1.0 upgrade scripts;
-- a regression test for metadata and accessor results;
+- a partial read path for external, uncompressed input;
+- a complete-value fallback for other input;
+- fresh-install and 0.2.0 upgrade scripts;
+- regression tests for result rules and storage paths;
 - versioned documentation and release automation.
 
-## What 0.2.0 does not contain
+## Current limits
 
-- partial TOAST reads;
-- text, array-index, or path accessors;
-- operators or planner hooks;
-- benchmark results;
-- a production support promise.
+- The function accepts a top-level text key only.
+- The partial path requires an external, uncompressed JSONB value.
+- The function can read the complete selected field value.
+- The release has no benchmark result or production support promise.
 
 !!! warning "Experimental work"
-    Install this version only in a test database. It reads the complete JSONB
-    value and makes no performance claim.
+    Install this version only in a test database. This release makes no
+    performance claim.
 
-[Install 0.2.0](getting-started.md){ .md-button .md-button--primary }
+[Install 0.3.0](getting-started.md){ .md-button .md-button--primary }
 [Read the problem](problem.md){ .md-button .md-button--primary }

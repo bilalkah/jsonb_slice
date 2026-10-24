@@ -10,6 +10,16 @@ directory before the container data.
 To restore a value from its TOAST storage form. This can include reading all
 chunks and decompressing them.
 
+## external value
+
+A value that PostgreSQL stores outside the main table row. The table row keeps
+a pointer to the value.
+
+## TOAST slice
+
+A requested byte range from a TOAST value. For an external, uncompressed
+value, PostgreSQL reads the TOAST chunks that cover the range.
+
 ## TOAST
 
 PostgreSQL's system for values that are too large for normal row storage. It
