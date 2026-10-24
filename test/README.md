@@ -8,7 +8,9 @@
 - results for each JSONB value type;
 - missing, empty, and multibyte field names;
 - non-object and SQL null inputs;
-- a large field from an external, fully detoasted table value;
+- sliced reads from an external, uncompressed table value;
+- proof that a sliced read fetches fewer bytes than the complete value;
+- full-detoast fallback for inline and compressed values;
 - removal of the function by `DROP EXTENSION`;
 - an extension upgrade from 0.1.0 to 0.2.0.
 

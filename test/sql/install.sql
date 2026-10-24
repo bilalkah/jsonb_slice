@@ -1,5 +1,10 @@
 CREATE EXTENSION jsonb_slice;
 
+CREATE FUNCTION jsonb_slice_test_fetched_bytes()
+RETURNS bigint
+AS '$libdir/jsonb_slice', 'jsonb_slice_test_fetched_bytes'
+LANGUAGE C;
+
 COPY (
     SELECT extname || ':' || extversion || ':' || extrelocatable
     FROM pg_extension
@@ -53,16 +58,71 @@ CREATE TABLE toasted_input (document jsonb);
 ALTER TABLE toasted_input ALTER COLUMN document SET STORAGE EXTERNAL;
 INSERT INTO toasted_input
 SELECT jsonb_build_object(
-    'field', jsonb_build_object('value', repeat('x', 8000)),
-    'padding', repeat('y', 8000)
+	'', 'empty key',
+	'array', jsonb_build_array(1, 2),
+	'boolean', true,
+	'json null', NULL,
+	'multibyte', 'çğıöşü 日本語',
+	'number', 42,
+	'object', jsonb_build_object('value', 1),
+	'string', 'value',
+	'ключ', 'значение',
+	'padding a', repeat('x', 12000),
+	'padding b', repeat('y', 12000)
 );
 
 COPY (
-    SELECT jsonb_slice_get(document, 'field') = document -> 'field'
-    FROM toasted_input
+	SELECT test_name || ':' ||
+		   (jsonb_slice_get(document, field_name) IS NOT DISTINCT FROM
+			document -> field_name)
+	FROM toasted_input
+	CROSS JOIN (VALUES
+		('array', 'array'),
+		('boolean', 'boolean'),
+		('empty key', ''),
+		('json null', 'json null'),
+		('missing key', 'missing'),
+		('multibyte key', 'ключ'),
+		('multibyte value', 'multibyte'),
+		('number', 'number'),
+		('object', 'object'),
+		('string', 'string')
+	) AS cases(test_name, field_name)
+	ORDER BY test_name
+) TO STDOUT;
+
+COPY (
+	SELECT jsonb_slice_test_fetched_bytes() > 0 AND
+		   jsonb_slice_test_fetched_bytes() <
+		   (SELECT pg_column_size(document) FROM toasted_input)
 ) TO STDOUT;
 
 DROP TABLE toasted_input;
+
+COPY (
+	SELECT jsonb_slice_get('{"field": 1}'::jsonb, 'field') = '1'::jsonb
+) TO STDOUT;
+
+COPY (
+	SELECT jsonb_slice_test_fetched_bytes() IS NULL
+) TO STDOUT;
+
+CREATE TABLE compressed_input (document jsonb);
+INSERT INTO compressed_input
+SELECT jsonb_build_object('field', 'value', 'padding', repeat('z', 24000));
+
+COPY (
+	SELECT pg_column_size(document) < 2000 AND
+		   jsonb_slice_get(document, 'field') = document -> 'field'
+	FROM compressed_input
+) TO STDOUT;
+
+COPY (
+	SELECT jsonb_slice_test_fetched_bytes() IS NULL
+) TO STDOUT;
+
+DROP TABLE compressed_input;
+DROP FUNCTION jsonb_slice_test_fetched_bytes();
 
 DROP EXTENSION jsonb_slice;
 

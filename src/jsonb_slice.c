@@ -22,18 +22,23 @@
 PG_MODULE_MAGIC;
 
 PG_FUNCTION_INFO_V1(jsonb_slice_get);
+PG_FUNCTION_INFO_V1(jsonb_slice_test_fetched_bytes);
+
+/* Last successful sliced call in this backend; exposed only to the tests. */
+static int64 last_fetched_bytes = -1;
 
 typedef struct SliceSource
 {
 	struct varlena *attr;
-	int32		total;
+	int32 total;
+	int64 fetched_bytes;
 } SliceSource;
 
 typedef struct ValueLocation
 {
-	uint32		type;
-	int32		start;
-	int32		length;
+	uint32 type;
+	int32 start;
+	int32 length;
 } ValueLocation;
 
 /*
@@ -49,12 +54,13 @@ slice_fetch(SliceSource *source, int64 start, int64 length)
 		length > source->total - start || length > INT_MAX)
 		return NULL;
 
-	slice = detoast_attr_slice(source->attr, (int32) start, (int32) length);
-	if (VARSIZE_ANY_EXHDR(slice) != (Size) length)
+	slice = detoast_attr_slice(source->attr, (int32)start, (int32)length);
+	if (VARSIZE_ANY_EXHDR(slice) != (Size)length)
 	{
 		pfree(slice);
 		return NULL;
 	}
+	source->fetched_bytes += length;
 	return slice;
 }
 
@@ -65,12 +71,12 @@ slice_fetch(SliceSource *source, int64 start, int64 length)
 static bool
 entry_offset(const JEntry *entries, uint32 index, uint32 *offset)
 {
-	uint64		result = 0;
-	uint32		i = index;
+	uint64 result = 0;
+	uint32 i = index;
 
 	while (i > 0)
 	{
-		JEntry		entry = entries[--i];
+		JEntry entry = entries[--i];
 
 		result += JBE_OFFLENFLD(entry);
 		if (JBE_HAS_OFF(entry))
@@ -78,64 +84,64 @@ entry_offset(const JEntry *entries, uint32 index, uint32 *offset)
 	}
 	if (result > PG_UINT32_MAX)
 		return false;
-	*offset = (uint32) result;
+	*offset = (uint32)result;
 	return true;
 }
 
 /* Return one entry's byte range inside its container data area. */
 static bool
-entry_range(const JEntry *entries, uint32 index, uint32 limit,
-			uint32 *offset, uint32 *length)
+entry_range(const JEntry *entries, uint32 index, uint32 limit, uint32 *offset,
+			uint32 *length)
 {
-	JEntry		entry = entries[index];
-	uint32		start;
-	uint64		end;
+	JEntry entry = entries[index];
+	uint32 start;
+	uint64 end;
 
 	if (!entry_offset(entries, index, &start))
 		return false;
-	end = JBE_HAS_OFF(entry) ? JBE_OFFLENFLD(entry) :
-		(uint64) start + JBE_OFFLENFLD(entry);
+	end = JBE_HAS_OFF(entry) ? JBE_OFFLENFLD(entry)
+							 : (uint64)start + JBE_OFFLENFLD(entry);
 	if (start > end || end > limit)
 		return false;
 
 	*offset = start;
-	*length = (uint32) (end - start);
+	*length = (uint32)(end - start);
 	return true;
 }
 
 /* Convert a value entry's range into an absolute range in the JSONB datum. */
 static bool
 locate_value(JEntry entry, int64 data_start, uint32 offset, uint32 length,
-			   ValueLocation *location)
+			 ValueLocation *location)
 {
-	uint32		type = entry & JENTRY_TYPEMASK;
-	uint32		padding;
+	uint32 type = entry & JENTRY_TYPEMASK;
+	uint32 padding;
 
 	switch (type)
 	{
-		case JENTRY_ISSTRING:
-			location->start = (int32) (data_start + offset);
-			location->length = (int32) length;
-			break;
-		case JENTRY_ISNUMERIC:
-		case JENTRY_ISCONTAINER:
-			padding = INTALIGN(offset) - offset;
-			if (padding > length)
-				return false;
-			location->start = (int32) (data_start + offset + padding);
-			location->length = (int32) (length - padding);
-			if (type == JENTRY_ISCONTAINER &&
-				location->length < (int32) sizeof(uint32))
-				return false;
-			break;
-		case JENTRY_ISNULL:
-		case JENTRY_ISBOOL_FALSE:
-		case JENTRY_ISBOOL_TRUE:
-			location->start = (int32) (data_start + offset);
-			location->length = 0;
-			break;
-		default:
+	case JENTRY_ISSTRING:
+		location->start = (int32)(data_start + offset);
+		location->length = (int32)length;
+		break;
+	case JENTRY_ISNUMERIC:
+	case JENTRY_ISCONTAINER:
+		padding = INTALIGN(offset) - offset;
+		if (padding > length)
 			return false;
+		location->start = (int32)(data_start + offset + padding);
+		location->length = (int32)(length - padding);
+		if (type == JENTRY_ISCONTAINER &&
+			location->length < (int32)sizeof(uint32))
+			return false;
+		break;
+	case JENTRY_ISNULL:
+	case JENTRY_ISBOOL_FALSE:
+	case JENTRY_ISBOOL_TRUE:
+		location->start = (int32)(data_start + offset);
+		location->length = 0;
+		break;
+	default:
+		return false;
 	}
 
 	location->type = type;
@@ -146,9 +152,9 @@ locate_value(JEntry entry, int64 data_start, uint32 offset, uint32 length,
 static bool
 numeric_is_valid(const char *data, int32 length)
 {
-	uint32		header_size;
-	uint32		stored_size;
-	uint16		numeric_header;
+	uint32 header_size;
+	uint32 stored_size;
+	uint16 numeric_header;
 
 	if (length < 1)
 		return false;
@@ -167,12 +173,12 @@ numeric_is_valid(const char *data, int32 length)
 	else
 		return false;
 
-	if (stored_size != (uint32) length ||
-		length < (int32) (header_size + sizeof(uint16)))
+	if (stored_size != (uint32)length ||
+		length < (int32)(header_size + sizeof(uint16)))
 		return false;
 	memcpy(&numeric_header, data + header_size, sizeof(uint16));
 	if ((numeric_header & 0x8000) == 0 &&
-		length < (int32) (header_size + 2 * sizeof(uint16)))
+		length < (int32)(header_size + 2 * sizeof(uint16)))
 		return false;
 	return true;
 }
@@ -181,55 +187,55 @@ numeric_is_valid(const char *data, int32 length)
 static bool
 value_result(SliceSource *source, const ValueLocation *location, Datum *result)
 {
-	JsonbValue	value;
+	JsonbValue value;
 	struct varlena *slice = NULL;
 
 	switch (location->type)
 	{
-		case JENTRY_ISNULL:
-			value.type = jbvNull;
-			break;
-		case JENTRY_ISBOOL_FALSE:
-		case JENTRY_ISBOOL_TRUE:
-			value.type = jbvBool;
-			value.val.boolean = location->type == JENTRY_ISBOOL_TRUE;
-			break;
-		case JENTRY_ISSTRING:
-			slice = slice_fetch(source, location->start, location->length);
-			if (slice == NULL)
-				return false;
-			value.type = jbvString;
-			value.val.string.val = VARDATA_ANY(slice);
-			value.val.string.len = location->length;
-			break;
-		case JENTRY_ISNUMERIC:
-			slice = slice_fetch(source, location->start, location->length);
-			if (slice == NULL ||
-				!numeric_is_valid(VARDATA_ANY(slice), location->length))
-			{
-				if (slice != NULL)
-					pfree(slice);
-				return false;
-			}
-			value.type = jbvNumeric;
-			value.val.numeric = (Numeric) VARDATA_ANY(slice);
-			break;
-		case JENTRY_ISCONTAINER:
-		{
-			Jsonb	   *jsonb_result;
-
-			slice = slice_fetch(source, location->start, location->length);
-			if (slice == NULL)
-				return false;
-			jsonb_result = palloc(VARHDRSZ + location->length);
-			SET_VARSIZE(jsonb_result, VARHDRSZ + location->length);
-			memcpy(VARDATA(jsonb_result), VARDATA_ANY(slice), location->length);
-			pfree(slice);
-			*result = JsonbPGetDatum(jsonb_result);
-			return true;
-		}
-		default:
+	case JENTRY_ISNULL:
+		value.type = jbvNull;
+		break;
+	case JENTRY_ISBOOL_FALSE:
+	case JENTRY_ISBOOL_TRUE:
+		value.type = jbvBool;
+		value.val.boolean = location->type == JENTRY_ISBOOL_TRUE;
+		break;
+	case JENTRY_ISSTRING:
+		slice = slice_fetch(source, location->start, location->length);
+		if (slice == NULL)
 			return false;
+		value.type = jbvString;
+		value.val.string.val = VARDATA_ANY(slice);
+		value.val.string.len = location->length;
+		break;
+	case JENTRY_ISNUMERIC:
+		slice = slice_fetch(source, location->start, location->length);
+		if (slice == NULL ||
+			!numeric_is_valid(VARDATA_ANY(slice), location->length))
+		{
+			if (slice != NULL)
+				pfree(slice);
+			return false;
+		}
+		value.type = jbvNumeric;
+		value.val.numeric = (Numeric)VARDATA_ANY(slice);
+		break;
+	case JENTRY_ISCONTAINER:
+	{
+		Jsonb *jsonb_result;
+
+		slice = slice_fetch(source, location->start, location->length);
+		if (slice == NULL)
+			return false;
+		jsonb_result = palloc(VARHDRSZ + location->length);
+		SET_VARSIZE(jsonb_result, VARHDRSZ + location->length);
+		memcpy(VARDATA(jsonb_result), VARDATA_ANY(slice), location->length);
+		pfree(slice);
+		*result = JsonbPGetDatum(jsonb_result);
+		return true;
+	}
+	default:
+		return false;
 	}
 
 	*result = JsonbPGetDatum(JsonbValueToJsonb(&value));
@@ -249,17 +255,17 @@ slice_lookup(SliceSource *source, const char *key, uint32 key_length,
 	struct varlena *header_slice;
 	struct varlena *directory_slice;
 	struct varlena *keys_slice = NULL;
-	uint32		header;
-	uint32		count;
-	uint64		directory_length;
-	int64		data_start;
-	uint32		data_length;
-	uint32		keys_end;
+	uint32 header;
+	uint32 count;
+	uint64 directory_length;
+	int64 data_start;
+	uint32 data_length;
+	uint32 keys_end;
 	const JEntry *entries;
 	const char *keys = NULL;
-	uint32		low = 0;
-	uint32		high;
-	bool		valid = false;
+	uint32 low = 0;
+	uint32 high;
+	bool valid = false;
 
 	*found = false;
 	header_slice = slice_fetch(source, 0, sizeof(uint32));
@@ -276,16 +282,16 @@ slice_lookup(SliceSource *source, const char *key, uint32 key_length,
 	count = header & JB_CMASK;
 	if (count == 0)
 		return true;
-	directory_length = 2 * (uint64) count * sizeof(JEntry);
+	directory_length = 2 * (uint64)count * sizeof(JEntry);
 	data_start = sizeof(uint32) + directory_length;
 	if (directory_length > INT_MAX || data_start > source->total)
 		return false;
-	data_length = (uint32) (source->total - data_start);
+	data_length = (uint32)(source->total - data_start);
 
 	directory_slice = slice_fetch(source, sizeof(uint32), directory_length);
 	if (directory_slice == NULL)
 		return false;
-	entries = (const JEntry *) VARDATA_ANY(directory_slice);
+	entries = (const JEntry *)VARDATA_ANY(directory_slice);
 	if (!entry_offset(entries, count, &keys_end) || keys_end > data_length)
 		goto done;
 	if (keys_end > 0)
@@ -299,10 +305,10 @@ slice_lookup(SliceSource *source, const char *key, uint32 key_length,
 	high = count;
 	while (low < high)
 	{
-		uint32		middle = low + (high - low) / 2;
-		uint32		key_offset;
-		uint32		stored_key_length;
-		int		comparison;
+		uint32 middle = low + (high - low) / 2;
+		uint32 key_offset;
+		uint32 stored_key_length;
+		int comparison;
 
 		if (!JBE_ISSTRING(entries[middle]) ||
 			!entry_range(entries, middle, keys_end, &key_offset,
@@ -317,8 +323,8 @@ slice_lookup(SliceSource *source, const char *key, uint32 key_length,
 
 		if (comparison == 0)
 		{
-			uint32		value_offset;
-			uint32		value_length;
+			uint32 value_offset;
+			uint32 value_length;
 			ValueLocation location;
 
 			if (!entry_range(entries, count + middle, data_length,
@@ -349,10 +355,10 @@ done:
 static Datum
 full_lookup(FunctionCallInfo fcinfo)
 {
-	Jsonb	   *document = PG_GETARG_JSONB_P(0);
-	text	   *field_name = PG_GETARG_TEXT_PP(1);
+	Jsonb *document = PG_GETARG_JSONB_P(0);
+	text *field_name = PG_GETARG_TEXT_PP(1);
 	JsonbValue *value;
-	Jsonb	   *result;
+	Jsonb *result;
 
 	if (!JB_ROOT_IS_OBJECT(document))
 	{
@@ -361,8 +367,8 @@ full_lookup(FunctionCallInfo fcinfo)
 		PG_RETURN_NULL();
 	}
 
-	value = getKeyJsonValueFromContainer(&document->root,
-									 VARDATA_ANY(field_name),
+	value =
+		getKeyJsonValueFromContainer(&document->root, VARDATA_ANY(field_name),
 									 VARSIZE_ANY_EXHDR(field_name), NULL);
 	if (value == NULL)
 	{
@@ -380,14 +386,15 @@ full_lookup(FunctionCallInfo fcinfo)
 Datum
 jsonb_slice_get(PG_FUNCTION_ARGS)
 {
-	struct varlena *attr = (struct varlena *) PG_GETARG_POINTER(0);
+	struct varlena *attr = (struct varlena *)PG_GETARG_POINTER(0);
 	struct varatt_external toast_pointer;
-	SliceSource	source;
-	text	   *field_name;
-	Datum		result = (Datum) 0;
-	bool		found;
-	bool		valid;
+	SliceSource source;
+	text *field_name;
+	Datum result = (Datum)0;
+	bool found;
+	bool valid;
 
+	last_fetched_bytes = -1;
 	if (!VARATT_IS_EXTERNAL_ONDISK(attr))
 		return full_lookup(fcinfo);
 
@@ -396,7 +403,8 @@ jsonb_slice_get(PG_FUNCTION_ARGS)
 		return full_lookup(fcinfo);
 	source.attr = attr;
 	source.total = VARATT_EXTERNAL_GET_EXTSIZE(toast_pointer);
-	if (source.total < (int32) sizeof(uint32))
+	source.fetched_bytes = 0;
+	if (source.total < (int32)sizeof(uint32))
 		return full_lookup(fcinfo);
 
 	field_name = PG_GETARG_TEXT_PP(1);
@@ -405,7 +413,17 @@ jsonb_slice_get(PG_FUNCTION_ARGS)
 	PG_FREE_IF_COPY(field_name, 1);
 	if (!valid)
 		return full_lookup(fcinfo);
+	last_fetched_bytes = source.fetched_bytes;
 	if (!found)
 		PG_RETURN_NULL();
 	return result;
+}
+
+/* Test support. This function is not installed as an extension member. */
+Datum
+jsonb_slice_test_fetched_bytes(PG_FUNCTION_ARGS)
+{
+	if (last_fetched_bytes < 0)
+		PG_RETURN_NULL();
+	PG_RETURN_INT64(last_fetched_bytes);
 }
