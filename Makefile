@@ -1,6 +1,8 @@
 EXTENSION = jsonb_slice
 MODULE_big = jsonb_slice
-OBJS = src/jsonb_slice.o
+OBJS = \
+	src/jsonb_slice.o \
+	src/jsonb_slice_core.o
 
 DATA = \
 	sql/jsonb_slice--0.1.0.sql \
