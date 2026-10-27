@@ -1,0 +1,140 @@
+CREATE EXTENSION jsonb_slice;
+CREATE FUNCTION jsonb_slice_test_fetched_bytes()
+RETURNS bigint
+AS '$libdir/jsonb_slice', 'jsonb_slice_test_fetched_bytes'
+LANGUAGE C;
+COPY (
+	SELECT test_name || ':' ||
+		   (jsonb_slice_path(document, path_elements)
+			IS NOT DISTINCT FROM document #> path_elements)
+	FROM (VALUES
+		('array index', '{"items": [10, 20]}'::jsonb,
+		 ARRAY['items', '1']),
+		('array negative', '{"items": [10, 20]}'::jsonb,
+		 ARRAY['items', '-1']),
+		('empty key', '{"": {"value": 1}}'::jsonb,
+		 ARRAY['', 'value']),
+		('empty path', '{"field": 1}'::jsonb, ARRAY[]::text[]),
+		('invalid index', '{"items": [10, 20]}'::jsonb,
+		 ARRAY['items', 'wrong']),
+		('json null', '{"a": {"b": null}}'::jsonb, ARRAY['a', 'b']),
+		('missing key', '{"a": {"b": 1}}'::jsonb,
+		 ARRAY['a', 'missing']),
+		('mixed path', '{"users": [{"name": "Bilal"}]}'::jsonb,
+		 ARRAY['users', '0', 'name']),
+		('null path element', '{"a": {"b": 1}}'::jsonb,
+		 ARRAY['a', NULL]::text[]),
+		('numeric object key', '{"0": "zero"}'::jsonb, ARRAY['0']),
+		('object result', '{"a": {"b": 1}}'::jsonb, ARRAY['a']),
+		('out of range', '{"items": [10, 20]}'::jsonb,
+		 ARRAY['items', '2']),
+		('past scalar', '{"a": 1}'::jsonb, ARRAY['a', 'b']),
+		('raw scalar', '42'::jsonb, ARRAY['0']),
+		('root array', '[{"name": "Bilal"}]'::jsonb,
+		 ARRAY['0', 'name'])
+	) AS cases(test_name, document, path_elements)
+	ORDER BY test_name
+) TO STDOUT;
+array index:true
+array negative:true
+empty key:true
+empty path:true
+invalid index:true
+json null:true
+missing key:true
+mixed path:true
+null path element:true
+numeric object key:true
+object result:true
+out of range:true
+past scalar:true
+raw scalar:true
+root array:true
+COPY (
+	SELECT jsonb_slice_path(NULL::jsonb, ARRAY['field']) IS NULL AND
+		   jsonb_slice_path('{"field": 1}'::jsonb, NULL::text[]) IS NULL
+) TO STDOUT;
+t
+CREATE TABLE path_input (document jsonb);
+ALTER TABLE path_input ALTER COLUMN document SET STORAGE EXTERNAL;
+INSERT INTO path_input
+SELECT jsonb_build_object(
+	'profile', jsonb_build_object(
+		'name', 'Bilal',
+		'active', true,
+		'details', jsonb_build_object('city', 'Istanbul')),
+	'items', jsonb_build_array(
+		jsonb_build_object('id', 1),
+		jsonb_build_object(
+			'id', 2,
+			'tags', jsonb_build_array('db', 'c'))),
+	'json null', NULL,
+	'padding a', repeat('x', 12000),
+	'padding b', repeat('y', 12000)
+);
+COPY (
+	SELECT test_name || ':' ||
+		   (jsonb_slice_path(document, path_elements)
+			IS NOT DISTINCT FROM document #> path_elements)
+	FROM path_input
+	CROSS JOIN (VALUES
+		('array negative', ARRAY['items', '-1', 'tags', '0']),
+		('boolean', ARRAY['profile', 'active']),
+		('container array', ARRAY['items']),
+		('container object', ARRAY['profile', 'details']),
+		('deep object', ARRAY['profile', 'details', 'city']),
+		('invalid index', ARRAY['items', 'wrong']),
+		('json null', ARRAY['json null']),
+		('missing key', ARRAY['profile', 'missing']),
+		('number', ARRAY['items', '0', 'id']),
+		('out of range', ARRAY['items', '2']),
+		('past scalar', ARRAY['profile', 'name', 'extra']),
+		('string', ARRAY['profile', 'name'])
+	) AS cases(test_name, path_elements)
+	ORDER BY test_name
+) TO STDOUT;
+array negative:true
+boolean:true
+container array:true
+container object:true
+deep object:true
+invalid index:true
+json null:true
+missing key:true
+number:true
+out of range:true
+past scalar:true
+string:true
+COPY (
+	SELECT jsonb_slice_path(document, ARRAY['profile', 'details', 'city']) =
+		   document #> ARRAY['profile', 'details', 'city']
+	FROM path_input
+) TO STDOUT;
+t
+COPY (
+	SELECT jsonb_slice_test_fetched_bytes() > 0 AND
+		   jsonb_slice_test_fetched_bytes() < pg_column_size(document)
+	FROM path_input
+) TO STDOUT;
+t
+DROP TABLE path_input;
+CREATE TABLE compressed_path_input (document jsonb);
+INSERT INTO compressed_path_input
+SELECT jsonb_build_object(
+	'profile', jsonb_build_object('name', 'Bilal'),
+	'padding', repeat('z', 24000)
+);
+COPY (
+	SELECT pg_column_size(document) < 2000 AND
+		   jsonb_slice_path(document, ARRAY['profile', 'name']) =
+		   document #> ARRAY['profile', 'name']
+	FROM compressed_path_input
+) TO STDOUT;
+t
+COPY (
+	SELECT jsonb_slice_test_fetched_bytes() IS NULL
+) TO STDOUT;
+t
+DROP TABLE compressed_path_input;
+DROP FUNCTION jsonb_slice_test_fetched_bytes();
+DROP EXTENSION jsonb_slice;

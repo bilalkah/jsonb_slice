@@ -1,23 +1,26 @@
 /*
  * jsonb_slice_core.c
  *
- * Partial reader for one top-level object field or array element.
+ * Partial reader for JSONB object fields and array elements. A lookup can use
+ * the root container or a nested ContainerLocation. A path read repeats the
+ * same lookup operation for each nested container.
  *
  * The sliced path applies only to an external, uncompressed JSONB value. It
  * does not change storage. Inline data is already in the table row, and
  * compressed external data needs complete decompression, so both use the
  * normal PostgreSQL path in jsonb_slice.c.
  *
- * A top-level object lookup reads:
+ * An object lookup inside one container reads:
  *
  *   1. the root container header;
  *   2. the complete JEntry directory;
- *   3. all top-level key bytes, so it can search for the requested key;
+ *   3. all key bytes in that object, so it can search for the requested key;
  *   4. only the selected value payload.
  *
- * A top-level array lookup reads the header, directory and selected value
- * payload. It does not need key bytes. Every offset derived from stored JSONB
- * metadata is checked against its container before a slice is requested.
+ * An array lookup inside one container reads the header, directory and
+ * selected value payload. It does not need key bytes. Every offset derived
+ * from stored JSONB metadata is checked against its container before a slice
+ * is requested.
  *
  * Slice offsets start at the logical JSONB data, after the outer varlena
  * header. A root object with N key-value pairs has this layout:

@@ -35,6 +35,20 @@ COPY (
 ) TO STDOUT;
 
 COPY (
+    SELECT p.provolatile::text || ':' || p.proisstrict::text || ':' ||
+           p.proparallel::text
+    FROM pg_proc AS p
+    WHERE p.oid = 'jsonb_slice_path(jsonb,text[])'::regprocedure
+) TO STDOUT;
+
+COPY (
+    SELECT p.provolatile::text || ':' || p.proisstrict::text || ':' ||
+           p.proparallel::text
+    FROM pg_proc AS p
+    WHERE p.oid = 'jsonb_slice_path_text(jsonb,text[])'::regprocedure
+) TO STDOUT;
+
+COPY (
     SELECT count(*)
     FROM pg_depend AS dependency
     JOIN pg_extension AS extension

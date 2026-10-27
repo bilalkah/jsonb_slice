@@ -3,13 +3,15 @@
  *
  * PostgreSQL entry points for jsonb_slice.
  *
- * The extension currently provides the same top-level reads as these built-in
- * operators:
+ * The extension currently provides the same reads as these built-in operators:
  *
  *   jsonb_slice_get(jsonb, text)          matches document -> 'key'
  *   jsonb_slice_get(jsonb, integer)       matches document -> index
  *   jsonb_slice_get_text(jsonb, text)     matches document ->> 'key'
  *   jsonb_slice_get_text(jsonb, integer)  matches document ->> index
+ *
+ *   jsonb_slice_path(jsonb, text[])       matches document #> path
+ *   jsonb_slice_path_text(jsonb, text[])  matches document #>> path
  *
  * An external, uncompressed JSONB value can use the sliced path in
  * jsonb_slice_core.c. Inline and compressed values use PostgreSQL's built-in
@@ -21,7 +23,14 @@
  */
 #include "postgres.h"
 
+#include <errno.h>
+#include <limits.h>
+#include <stdlib.h>
+
+#include "catalog/pg_type_d.h"
 #include "fmgr.h"
+#include "utils/array.h"
+#include "utils/builtins.h"
 #include "utils/fmgrprotos.h"
 #include "utils/jsonb.h"
 
@@ -33,6 +42,8 @@ PG_FUNCTION_INFO_V1(jsonb_slice_get);
 PG_FUNCTION_INFO_V1(jsonb_slice_get_index);
 PG_FUNCTION_INFO_V1(jsonb_slice_get_text_key);
 PG_FUNCTION_INFO_V1(jsonb_slice_get_text_index);
+PG_FUNCTION_INFO_V1(jsonb_slice_path);
+PG_FUNCTION_INFO_V1(jsonb_slice_path_text);
 PG_FUNCTION_INFO_V1(jsonb_slice_test_fetched_bytes);
 
 /* Last successful sliced call in this backend; exposed only to the tests. */
@@ -152,6 +163,158 @@ slice_array_element(FunctionCallInfo fcinfo, SliceSource *source,
 							  found);
 }
 
+/* Deconstruct a text path with the API available in this PostgreSQL version. */
+static void
+deconstruct_path_array(ArrayType *path_array, Datum **elements, bool **nulls,
+					   int *element_count)
+{
+#if PG_VERSION_NUM >= 160000
+	deconstruct_array_builtin(path_array, TEXTOID, elements, nulls,
+							  element_count);
+#else
+	deconstruct_array(path_array, TEXTOID, -1, false, TYPALIGN_INT, elements,
+					  nulls, element_count);
+#endif
+}
+
+/* Parse one array step without raising an error for non-integer path text. */
+static bool
+path_array_index(text *element, int32 *index)
+{
+	char *input = text_to_cstring(element);
+	char *end;
+	long parsed;
+	bool valid;
+
+	errno = 0;
+	parsed = strtol(input, &end, 10);
+	valid = end != input && *end == '\0' && errno == 0 && parsed >= INT_MIN &&
+			parsed <= INT_MAX;
+	if (valid)
+		*index = (int32)parsed;
+	pfree(input);
+	return valid;
+}
+
+/*
+ * Follow a non-empty path through nested object and array containers.
+ * Return false only when the caller must use PostgreSQL's complete-value
+ * path. Return true with found=false when the path has no result.
+ */
+static bool
+slice_path_value(FunctionCallInfo fcinfo, Datum *path_elements,
+				 int path_element_count, SliceSource *source,
+				 ValueLocation *value, bool *found)
+{
+	struct varlena *attr = (struct varlena *)PG_GETARG_POINTER(0);
+	ContainerLocation container;
+	ValueLocation located;
+	int step;
+
+	*found = false;
+	if (!slice_source_init(attr, source))
+		return false;
+
+	container.start = 0;
+	container.size = source->total_size;
+	container.root = true;
+
+	for (step = 0; step < path_element_count; step++)
+	{
+		text *element = DatumGetTextPP(path_elements[step]);
+		uint32 item_count;
+		uint32 header;
+		bool step_found;
+		bool valid;
+
+		if (!slice_read_container_header(source, &container, &header))
+			return false;
+		item_count = header & JB_CMASK;
+
+		if (header & JB_FOBJECT)
+		{
+			valid = slice_object_lookup(
+				source, &container, item_count, VARDATA_ANY(element),
+				VARSIZE_ANY_EXHDR(element), &located, &step_found);
+		}
+		else
+		{
+			int32 requested;
+			uint32 index;
+
+			if (!path_array_index(element, &requested) ||
+				!slice_normalize_array_index(requested, item_count, &index))
+				return true;
+			valid = slice_array_lookup(source, &container, item_count, index,
+									   &located, &step_found);
+		}
+
+		if (!valid)
+			return false;
+		if (!step_found)
+			return true;
+		if (step == path_element_count - 1)
+		{
+			*value = located;
+			*found = true;
+			return true;
+		}
+
+		/* More path remains, so the selected value must be a container. */
+		if (located.type != JENTRY_ISCONTAINER)
+			return true;
+		container.start = located.start;
+		container.size = located.size;
+		container.root = false;
+	}
+
+	return true;
+}
+
+/*
+ * Read and validate the SQL path argument, then locate its final value.
+ * has_null_element distinguishes a NULL path element from a missing value;
+ * both SQL functions return NULL without trying a storage fallback.
+ */
+static bool
+slice_path_argument(FunctionCallInfo fcinfo, SliceSource *source,
+					ValueLocation *value, bool *found, bool *has_null_element)
+{
+	ArrayType *path_array = PG_GETARG_ARRAYTYPE_P(1);
+	Datum *path_elements;
+	bool *path_nulls;
+	int path_element_count;
+	bool valid = false;
+	int step;
+
+	*found = false;
+	*has_null_element = false;
+	deconstruct_path_array(path_array, &path_elements, &path_nulls,
+						   &path_element_count);
+
+	/* An empty path returns the complete input, so slicing cannot reduce it. */
+	if (path_element_count == 0)
+		goto done;
+	for (step = 0; step < path_element_count; step++)
+	{
+		if (path_nulls[step])
+		{
+			*has_null_element = true;
+			valid = true;
+			goto done;
+		}
+	}
+
+	valid = slice_path_value(fcinfo, path_elements, path_element_count, source,
+							 value, found);
+
+done:
+	pfree(path_elements);
+	pfree(path_nulls);
+	PG_FREE_IF_COPY(path_array, 1);
+	return valid;
+}
+
 /* Return one top-level object field as JSONB, like the -> text operator. */
 Datum
 jsonb_slice_get(PG_FUNCTION_ARGS)
@@ -247,6 +410,65 @@ jsonb_slice_get_text_index(PG_FUNCTION_ARGS)
 	}
 	if (!slice_value_text_result(&source, &value, &result, &is_null))
 		return jsonb_array_element_text(fcinfo);
+
+	last_fetched_bytes = source.fetched_bytes;
+	if (is_null)
+		PG_RETURN_NULL();
+	return result;
+}
+
+/* Return one nested value as JSONB, like the #> text[] operator. */
+Datum
+jsonb_slice_path(PG_FUNCTION_ARGS)
+{
+	SliceSource source;
+	ValueLocation value;
+	Datum result = (Datum)0;
+	bool found;
+	bool has_null_element;
+
+	last_fetched_bytes = -1;
+	if (!slice_path_argument(fcinfo, &source, &value, &found,
+							 &has_null_element))
+		return jsonb_extract_path(fcinfo);
+	if (has_null_element)
+		PG_RETURN_NULL();
+	if (!found)
+	{
+		last_fetched_bytes = source.fetched_bytes;
+		PG_RETURN_NULL();
+	}
+	if (!slice_value_result(&source, &value, &result))
+		return jsonb_extract_path(fcinfo);
+
+	last_fetched_bytes = source.fetched_bytes;
+	return result;
+}
+
+/* Return one nested value as SQL text, like the #>> text[] operator. */
+Datum
+jsonb_slice_path_text(PG_FUNCTION_ARGS)
+{
+	SliceSource source;
+	ValueLocation value;
+	Datum result = (Datum)0;
+	bool found;
+	bool has_null_element;
+	bool is_null;
+
+	last_fetched_bytes = -1;
+	if (!slice_path_argument(fcinfo, &source, &value, &found,
+							 &has_null_element))
+		return jsonb_extract_path_text(fcinfo);
+	if (has_null_element)
+		PG_RETURN_NULL();
+	if (!found)
+	{
+		last_fetched_bytes = source.fetched_bytes;
+		PG_RETURN_NULL();
+	}
+	if (!slice_value_text_result(&source, &value, &result, &is_null))
+		return jsonb_extract_path_text(fcinfo);
 
 	last_fetched_bytes = source.fetched_bytes;
 	if (is_null)
