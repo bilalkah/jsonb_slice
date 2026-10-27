@@ -35,7 +35,10 @@ COPY (
            (jsonb_slice_path('{"a": {"b": [10, 20]}}'::jsonb,
                              ARRAY['a', 'b', '1']) = '20'::jsonb) || ':' ||
            (jsonb_slice_path_text('{"a": {"b": [10, 20]}}'::jsonb,
-                                  ARRAY['a', 'b', '1']) = '20')
+                                  ARRAY['a', 'b', '1']) = '20') || ':' ||
+           ((('{"field": "value"}'::jsonb ~>> 'field') = 'value') AND
+            (('[10, 20]'::jsonb ~> 1) = '20'::jsonb) AND
+            (('{"a": {"b": 20}}'::jsonb ~#>> ARRAY['a', 'b']) = '20'))
     FROM pg_extension
     WHERE extname = 'jsonb_slice'
 ) TO STDOUT;

@@ -1,0 +1,92 @@
+CREATE EXTENSION jsonb_slice;
+COPY (
+	SELECT test_name || ':' ||
+		   ((document ~> field_name) IS NOT DISTINCT FROM
+			jsonb_slice_get(document, field_name)) || ':' ||
+		   ((document ~> field_name) IS NOT DISTINCT FROM
+			document -> field_name)
+	FROM (VALUES
+		('jsonb key', '{"field": {"value": 1}}'::jsonb, 'field'),
+		('jsonb key missing', '{"field": 1}'::jsonb, 'missing')
+	) AS cases(test_name, document, field_name)
+	ORDER BY test_name
+) TO STDOUT;
+jsonb key:true:true
+jsonb key missing:true:true
+COPY (
+	SELECT test_name || ':' ||
+		   ((document ~> element_index) IS NOT DISTINCT FROM
+			jsonb_slice_get(document, element_index)) || ':' ||
+		   ((document ~> element_index) IS NOT DISTINCT FROM
+			document -> element_index)
+	FROM (VALUES
+		('jsonb index', '[10, 20]'::jsonb, 1),
+		('jsonb index negative', '[10, 20]'::jsonb, -1),
+		('jsonb index missing', '[10, 20]'::jsonb, 2)
+	) AS cases(test_name, document, element_index)
+	ORDER BY test_name
+) TO STDOUT;
+jsonb index:true:true
+jsonb index missing:true:true
+jsonb index negative:true:true
+COPY (
+	SELECT test_name || ':' ||
+		   ((document ~>> field_name) IS NOT DISTINCT FROM
+			jsonb_slice_get_text(document, field_name)) || ':' ||
+		   ((document ~>> field_name) IS NOT DISTINCT FROM
+			document ->> field_name)
+	FROM (VALUES
+		('text key', '{"field": "value"}'::jsonb, 'field'),
+		('text key null', '{"field": null}'::jsonb, 'field')
+	) AS cases(test_name, document, field_name)
+	ORDER BY test_name
+) TO STDOUT;
+text key:true:true
+text key null:true:true
+COPY (
+	SELECT test_name || ':' ||
+		   ((document ~>> element_index) IS NOT DISTINCT FROM
+			jsonb_slice_get_text(document, element_index)) || ':' ||
+		   ((document ~>> element_index) IS NOT DISTINCT FROM
+			document ->> element_index)
+	FROM (VALUES
+		('text index', '["first", "last"]'::jsonb, 0),
+		('text index null', '[null]'::jsonb, 0)
+	) AS cases(test_name, document, element_index)
+	ORDER BY test_name
+) TO STDOUT;
+text index:true:true
+text index null:true:true
+COPY (
+	SELECT test_name || ':' ||
+		   ((document ~#> path_elements) IS NOT DISTINCT FROM
+			jsonb_slice_path(document, path_elements)) || ':' ||
+		   ((document ~#> path_elements) IS NOT DISTINCT FROM
+			document #> path_elements)
+	FROM (VALUES
+		('jsonb path', '{"a": {"b": [10, 20]}}'::jsonb,
+		 ARRAY['a', 'b', '1']),
+		('jsonb path missing', '{"a": {"b": 1}}'::jsonb,
+		 ARRAY['a', 'missing'])
+	) AS cases(test_name, document, path_elements)
+	ORDER BY test_name
+) TO STDOUT;
+jsonb path:true:true
+jsonb path missing:true:true
+COPY (
+	SELECT test_name || ':' ||
+		   ((document ~#>> path_elements) IS NOT DISTINCT FROM
+			jsonb_slice_path_text(document, path_elements)) || ':' ||
+		   ((document ~#>> path_elements) IS NOT DISTINCT FROM
+			document #>> path_elements)
+	FROM (VALUES
+		('text path', '{"a": {"b": "value"}}'::jsonb,
+		 ARRAY['a', 'b']),
+		('text path null', '{"a": {"b": null}}'::jsonb,
+		 ARRAY['a', 'b'])
+	) AS cases(test_name, document, path_elements)
+	ORDER BY test_name
+) TO STDOUT;
+text path:true:true
+text path null:true:true
+DROP EXTENSION jsonb_slice;

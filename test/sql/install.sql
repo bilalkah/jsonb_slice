@@ -59,8 +59,25 @@ COPY (
       AND extension.extname = 'jsonb_slice'
 ) TO STDOUT;
 
+COPY (
+    SELECT count(*)
+    FROM pg_depend AS dependency
+    JOIN pg_extension AS extension
+      ON extension.oid = dependency.refobjid
+    WHERE dependency.refclassid = 'pg_extension'::regclass
+      AND dependency.classid = 'pg_operator'::regclass
+      AND dependency.deptype = 'e'
+      AND extension.extname = 'jsonb_slice'
+) TO STDOUT;
+
 DROP EXTENSION jsonb_slice;
 
 COPY (
-    SELECT to_regprocedure('jsonb_slice_get(jsonb,text)') IS NULL
+    SELECT to_regprocedure('jsonb_slice_get(jsonb,text)') IS NULL AND
+           to_regoperator('~>(jsonb,text)') IS NULL AND
+           to_regoperator('~>(jsonb,integer)') IS NULL AND
+           to_regoperator('~>>(jsonb,text)') IS NULL AND
+           to_regoperator('~>>(jsonb,integer)') IS NULL AND
+           to_regoperator('~#>(jsonb,text[])') IS NULL AND
+           to_regoperator('~#>>(jsonb,text[])') IS NULL
 ) TO STDOUT;

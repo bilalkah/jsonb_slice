@@ -21,6 +21,7 @@ REGRESS = \
 	get_text_index \
 	get_path \
 	get_path_text \
+	operators \
 	storage_fallback \
 	upgrade
 REGRESS_OPTS = --inputdir=test

@@ -25,6 +25,42 @@ RETURNS text
 AS 'MODULE_PATHNAME', 'jsonb_slice_path_text'
 LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
 
+CREATE OPERATOR ~> (
+	LEFTARG = jsonb,
+	RIGHTARG = text,
+	PROCEDURE = jsonb_slice_get
+);
+
+CREATE OPERATOR ~> (
+	LEFTARG = jsonb,
+	RIGHTARG = integer,
+	PROCEDURE = jsonb_slice_get
+);
+
+CREATE OPERATOR ~>> (
+	LEFTARG = jsonb,
+	RIGHTARG = text,
+	PROCEDURE = jsonb_slice_get_text
+);
+
+CREATE OPERATOR ~>> (
+	LEFTARG = jsonb,
+	RIGHTARG = integer,
+	PROCEDURE = jsonb_slice_get_text
+);
+
+CREATE OPERATOR ~#> (
+	LEFTARG = jsonb,
+	RIGHTARG = text[],
+	PROCEDURE = jsonb_slice_path
+);
+
+CREATE OPERATOR ~#>> (
+	LEFTARG = jsonb,
+	RIGHTARG = text[],
+	PROCEDURE = jsonb_slice_path_text
+);
+
 COMMENT ON FUNCTION jsonb_slice_get(jsonb, integer) IS
 'read one top-level array element with TOAST slices when the stored jsonb value permits it';
 
@@ -40,5 +76,23 @@ COMMENT ON FUNCTION jsonb_slice_path(jsonb, text[]) IS
 COMMENT ON FUNCTION jsonb_slice_path_text(jsonb, text[]) IS
 'read one nested path as text with TOAST slices when the stored jsonb value permits it';
 
+COMMENT ON OPERATOR ~> (jsonb, text) IS
+'read one top-level object field as JSONB with jsonb_slice_get';
+
+COMMENT ON OPERATOR ~> (jsonb, integer) IS
+'read one top-level array element as JSONB with jsonb_slice_get';
+
+COMMENT ON OPERATOR ~>> (jsonb, text) IS
+'read one top-level object field as text with jsonb_slice_get_text';
+
+COMMENT ON OPERATOR ~>> (jsonb, integer) IS
+'read one top-level array element as text with jsonb_slice_get_text';
+
+COMMENT ON OPERATOR ~#> (jsonb, text[]) IS
+'read one nested path as JSONB with jsonb_slice_path';
+
+COMMENT ON OPERATOR ~#>> (jsonb, text[]) IS
+'read one nested path as text with jsonb_slice_path_text';
+
 COMMENT ON EXTENSION jsonb_slice IS
-'Study partial reads of large jsonb values; 0.4.0 adds nested path accessors';
+'Study partial reads of large jsonb values; 0.4.0 adds accessors and matching operators';
