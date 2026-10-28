@@ -12,6 +12,7 @@ on:
         type: string
 
 permissions:
+  actions: write
   contents: write
 
 jobs:
@@ -157,3 +158,8 @@ jobs:
               --draft
             gh release edit "$TAG" --draft=false --latest
           fi
+
+      - name: Refresh versioned documentation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref main
