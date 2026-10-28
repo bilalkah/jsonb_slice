@@ -1,4 +1,4 @@
-# JSONB object layout
+# JSONB container layout
 
 The partial-read path depends on the PostgreSQL JSONB binary layout. This page
 explains the parts that `jsonb_slice` reads. It does not describe the complete
@@ -88,6 +88,68 @@ data_start        = JSONB_CONTAINER_HEADER_SIZE + directory bytes
 All key entries come first. All value entries follow them. The key bytes then
 come before the value bytes.
 
+## Array directory
+
+An array uses one `JEntry` for each element. It does not have separate key
+entries.
+
+```json
+[10, 20, {"name": "Ada"}]
+```
+
+```text
++----------------------------------+
+| container header                 | type = array, count = 3
++----------------------------------+
+| element JEntry 0                 | describes 10
+| element JEntry 1                 | describes 20
+| element JEntry 2                 | describes the object
++----------------------------------+ <- data_start
+| element payloads                 |
++----------------------------------+
+```
+
+The requested index selects one entry. A negative index is first converted to
+its position from the start of the array. An index outside the array has no
+result.
+
+## Nested containers
+
+The complete JSONB value has one outer varlena header. Each object or array
+inside that value has its own container header and directory.
+
+```json
+{
+  "users": [
+    {"name": "Ada"}
+  ]
+}
+```
+
+```text
+outer varlena header
+└── root object container
+    └── "users" value: array container
+        └── element 0: object container
+            └── "name" value: string
+```
+
+A container `JEntry` locates the complete nested container. The nested bytes
+start with that container's header. `ContainerLocation` records the absolute
+start and size of the current container. This prevents a path lookup from
+reading outside the selected container.
+
+For `ARRAY['users', '0', 'name']`, the extension performs these steps:
+
+1. find `users` in the root object;
+2. enter the selected array container;
+3. locate array element `0`;
+4. enter the selected object container;
+5. find `name` and read its value.
+
+The extension reads container metadata during the first four steps. It does
+not read the other element payloads.
+
 ## What a JEntry records
 
 A `JEntry` records the value type and position information. The type can
@@ -128,7 +190,7 @@ continues only when the external value is uncompressed.
 
 ## Read sequence
 
-For an external, uncompressed object, `slice_lookup()` reads:
+For an external, uncompressed object lookup, the partial reader reads:
 
 1. the four-byte container header;
 2. the complete `JEntry` directory, which contains metadata only;
@@ -138,3 +200,7 @@ For an external, uncompressed object, `slice_lookup()` reads:
 Every calculated range is checked against the logical data length before a
 slice request. Invalid metadata stops the partial parser and selects the
 normal PostgreSQL path.
+
+A path lookup repeats the header, directory, and key steps for each visited
+container. An array step has no key slice. The last step reads the complete
+selected value.

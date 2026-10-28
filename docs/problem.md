@@ -19,24 +19,28 @@ table row -> all TOAST chunks -> complete jsonb -> one field
 This behavior is general and correct. Its cost can be high when a query needs
 one small field from a large document.
 
-## The 0.3.0 read
+## The 0.4.0 read
 
-0.3.0 checks the storage form before PostgreSQL detoasts the input. The
-function uses TOAST slices for an external, uncompressed value.
+0.4.0 checks the storage form before PostgreSQL detoasts the input. The
+accessors use TOAST slices for an external, uncompressed value.
 
 ```text
-external jsonb -> root directory and keys -> selected value -> result
+external jsonb -> visited container directories -> selected value -> result
 ```
 
-The function reads the root header first. It then reads the top-level entry
-directory and key bytes. A binary search finds the requested key. The function
-then reads the bytes for the selected value.
+The reader starts with the root container. An object step reads that object's
+directory and key bytes. A binary search finds the requested key. An array
+step reads the array directory and locates the requested index. A nested path
+repeats these steps until it reaches the selected value.
 
-Inline and compressed values use the normal complete-value path from 0.2.0.
-The result rules stay the same for both paths.
+The reader does not fetch sibling value payloads during traversal. It reads
+the complete selected value after the final step. Inline and compressed
+values use PostgreSQL's complete-value functions. The result rules stay the
+same for both paths.
 
 ## Current result
 
-0.3.0 can read part of an external, uncompressed JSONB value. In the regression
-test, the requested slice lengths total less than the complete test value. The
-release makes no general performance claim.
+0.4.0 can read part of an external, uncompressed JSONB value for key, index,
+and path accessors. In selected regression fixtures, the requested slice sizes
+total less than the stored test value. The release makes no general
+performance claim.

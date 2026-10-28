@@ -1,14 +1,16 @@
 # Repository map
 
-0.3.0 is an installable PostgreSQL C extension with one JSONB accessor.
+0.4.0 is an installable PostgreSQL C extension with key, index, and path
+accessors.
 
 | Path | Responsibility |
 |---|---|
 | `Makefile` | PGXS library, package, and regression commands |
 | `jsonb_slice.control` | Extension metadata and default version |
-| `src/` | C source for the top-level object lookup |
-| `sql/` | Installation and upgrade scripts for versions 0.1.0 through 0.3.0 |
-| `test/` | Package, read-path, removal, and upgrade regression test |
+| `src/jsonb_slice.c` | SQL entry points, arguments, fallbacks, and results |
+| `src/jsonb_slice_core.c` | TOAST slices and JSONB container parsing |
+| `sql/` | Installation and upgrade scripts for versions 0.1.0 through 0.4.0 |
+| `test/` | Package, accessor, operator, storage, removal, and upgrade tests |
 | `docs/` | Documentation for the current source version |
 | `landing/` | The page at `/jsonb_slice/` that lists released versions |
 | `scripts/` | Versioned documentation build |
@@ -25,6 +27,7 @@ archive and the GitHub Release notes.
 tag v0.1.0 -> https://bilalkah.github.io/jsonb_slice/0.1.0/
 tag v0.2.0 -> https://bilalkah.github.io/jsonb_slice/0.2.0/
 tag v0.3.0 -> https://bilalkah.github.io/jsonb_slice/0.3.0/
+tag v0.4.0 -> https://bilalkah.github.io/jsonb_slice/0.4.0/
 ```
 
 The root path is a release index. It is not an alias for one version.

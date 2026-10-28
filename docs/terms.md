@@ -167,6 +167,22 @@ The `JEntry` array at the start of a JSONB object. The key entries come first.
 The value entries follow them. The key and value bytes come after the complete
 directory.
 
+### JSONB array directory
+
+The `JEntry` array at the start of a JSONB array. It contains one entry for
+each array element. Array elements do not have key entries.
+
+### nested container
+
+An object or array stored as a value inside another JSONB container. It has
+its own container header and directory. It does not have another outer varlena
+header.
+
+### raw scalar wrapper
+
+The one-element root array that PostgreSQL uses to store a JSON scalar in
+JSONB. The scalar flag is valid only on this root container.
+
 ## Project structures
 
 ### `SliceSource`
@@ -178,5 +194,17 @@ a local C structure. It is not stored in PostgreSQL.
 ### `ValueLocation`
 
 The decoded location of one JSONB value. It keeps the JEntry type, absolute
-slice offset, and requested length. This lets the code validate a location
+slice offset, and requested size. This lets the code validate a location
 before it fetches and rebuilds the result.
+
+### `ContainerLocation`
+
+The absolute start and byte size of one JSONB container. It also records
+whether the container is the root. Path traversal replaces this value when it
+enters a nested object or array.
+
+### complete-value fallback
+
+The call to a PostgreSQL JSONB function when the extension cannot safely use
+TOAST slices. Inline input, compressed input, an empty path, or invalid storage
+metadata can select this path.

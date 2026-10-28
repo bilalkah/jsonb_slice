@@ -1,7 +1,7 @@
-# Install 0.3.0
+# Install 0.4.0
 
-0.3.0 is a PostgreSQL C extension. It provides one function:
-`jsonb_slice_get(jsonb, text)`.
+0.4.0 is a PostgreSQL C extension. It provides key, index, and path accessors
+with JSONB and text results.
 
 ## Requirements
 
@@ -39,19 +39,20 @@ FROM pg_extension
 WHERE extname = 'jsonb_slice';
 ```
 
-The version must be `0.3.0`. The extension is relocatable.
+The version must be `0.4.0`. The extension is relocatable.
 
-## Upgrade from 0.2.0
+## Upgrade from 0.3.0
 
-Install the 0.3.0 files. Then run:
+Install the 0.4.0 files. Then run:
 
 ```sql
-ALTER EXTENSION jsonb_slice UPDATE TO '0.3.0';
+ALTER EXTENSION jsonb_slice UPDATE TO '0.4.0';
 ```
 
-The upgrade keeps the function signature and changes its read path.
+The upgrade adds the new function signatures and operators. It does not change
+stored JSONB values.
 
-## Read one field
+## Read by key
 
 ```sql
 SELECT jsonb_slice_get(
@@ -62,15 +63,65 @@ SELECT jsonb_slice_get(
 
 The result is the JSONB string `"Ada"`.
 
-The function has these rules:
+Use `jsonb_slice_get_text` for an SQL text result:
 
-- a stored field returns the same JSONB value as `document -> field_name`;
-- a missing field returns SQL `NULL`;
-- an array or scalar input returns SQL `NULL`;
-- a stored JSON `null` returns JSONB `null`;
-- a SQL `NULL` argument returns SQL `NULL`.
+```sql
+SELECT jsonb_slice_get_text('{"name": "Ada"}'::jsonb, 'name');
+```
 
-## Run the regression test
+The result is `Ada`.
+
+## Read by array index
+
+```sql
+SELECT jsonb_slice_get('[10, 20, 30]'::jsonb, 1);
+SELECT jsonb_slice_get_text('["first", "last"]'::jsonb, -1);
+```
+
+The first result is JSONB `20`. The second result is the text `last`. A
+negative index counts from the end.
+
+## Read a nested path
+
+```sql
+SELECT jsonb_slice_path(
+    '{"users": [{"name": "Ada"}]}'::jsonb,
+    ARRAY['users', '0', 'name']
+);
+
+SELECT jsonb_slice_path_text(
+    '{"users": [{"name": "Ada"}]}'::jsonb,
+    ARRAY['users', '0', 'name']
+);
+```
+
+The first result is the JSONB string `"Ada"`. The second result is the text
+`Ada`.
+
+## Use the operators
+
+The extension operators call the same functions:
+
+```sql
+SELECT '{"name": "Ada"}'::jsonb ~> 'name';
+SELECT '["first", "last"]'::jsonb ~>> -1;
+SELECT '{"users": [{"name": "Ada"}]}'::jsonb
+       ~#>> ARRAY['users', '0', 'name'];
+```
+
+The `~>` and `~#>` operators return JSONB. The `~>>` and `~#>>` operators
+return SQL text.
+
+## Result rules
+
+- A missing key, index, or path returns SQL `NULL`.
+- A JSONB result preserves JSON `null`.
+- A text result converts JSON `null` to SQL `NULL`.
+- A path can move through objects and arrays.
+- A path that continues through a scalar returns SQL `NULL`.
+- A SQL `NULL` argument returns SQL `NULL`.
+
+## Run the regression tests
 
 The PostgreSQL server must be running. The current operating-system user must
 be able to create an extension in the test database.
@@ -79,12 +130,13 @@ be able to create an extension in the test database.
 make installcheck PG_CONFIG=/path/to/pg_config
 ```
 
-The test checks a fresh installation, the accessor rules, the storage paths,
-extension removal, and upgrades from 0.1.0 through 0.3.0.
+The tests check a fresh installation, all six accessor signatures, all six
+operator signatures, storage fallbacks, extension removal, and upgrades from
+0.1.0 through 0.4.0.
 
 ## Current boundary
 
-0.3.0 uses TOAST slices for an external, uncompressed JSONB value. It reads
-the root directory, all top-level keys, and the selected field value. It uses
-the normal complete-value lookup for inline or compressed input. This release
-makes no performance claim.
+0.4.0 uses TOAST slices for an external, uncompressed JSONB value. It reads
+the directory of each visited container, the required object key bytes, and
+the final selected value. Inline or compressed input uses PostgreSQL's
+complete-value functions. This release makes no general performance claim.

@@ -1,5 +1,5 @@
 {
-  "current": "0.3.0",
+  "current": "0.4.0",
   "releases": [
     {
       "version": "0.1.0",
@@ -21,6 +21,13 @@
       "state": "released",
       "title": "Read selected JSONB data through TOAST slices",
       "summary": "This release reads the root directory, object keys, and selected value through TOAST slices when the input is external and uncompressed."
+    },
+    {
+      "version": "0.4.0",
+      "sequence": 4,
+      "state": "released",
+      "title": "Add JSONB accessors and operators",
+      "summary": "This release adds key, index, and path accessors with JSONB and text results. It also adds matching operators."
     }
   ]
 }

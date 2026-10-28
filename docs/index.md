@@ -1,57 +1,68 @@
-# Read one field with TOAST slices
+# Read selected JSONB data with TOAST slices
 
-<span class="release-mark">0.3.0 · partial read path</span>
+<span class="release-mark">0.4.0 · accessors and operators</span>
 
-`jsonb_slice` is a PostgreSQL extension experiment. Version 0.3.0 provides
-`jsonb_slice_get(jsonb, text)`. The function reads one top-level object field
-and returns the same JSONB value as PostgreSQL's `->` operator with a text key.
+`jsonb_slice` is a PostgreSQL extension experiment. Version 0.4.0 can read an
+object key, an array index, or a nested path. Each read can return JSONB or SQL
+text. Its result rules match PostgreSQL's built-in JSONB operators.
 
-The function uses TOAST slices when the input is external and uncompressed.
-It reads the root directory, the object keys, and the selected value. The
-function uses PostgreSQL's normal complete-value path for other storage forms.
+The extension uses TOAST slices when the input is external and uncompressed.
+It follows the required object and array containers and reads the selected
+value. Inline and compressed inputs use PostgreSQL's complete-value functions.
 
 <div class="doc-grid" markdown>
 
 <div class="doc-card" markdown>
 
-## Input
+## Read forms
 
-The first argument is a JSONB value. The second argument is a top-level object
-field name.
+Use a text key, an integer array index, or a `text[]` path. Negative indexes
+count from the end of an array.
 
 </div>
 
 <div class="doc-card" markdown>
 
-## Result
+## Result forms
 
-The result matches `document -> field_name`. This rule includes missing fields,
-JSON null, containers, arrays, scalars, and SQL null arguments.
-
-</div>
+JSONB results preserve JSON `null`. Text results return SQL `NULL` for JSON
+`null`. Missing values also return SQL `NULL`.
 
 </div>
 
-## What 0.3.0 contains
+</div>
 
-- a PostgreSQL shared library written in C;
-- one top-level object accessor;
-- a partial read path for external, uncompressed input;
-- a complete-value fallback for other input;
-- fresh-install and 0.2.0 upgrade scripts;
-- regression tests for result rules and storage paths;
+## SQL interface
+
+| Function | Extension operator | PostgreSQL equivalent |
+|---|---|---|
+| `jsonb_slice_get(jsonb, text)` | `jsonb ~> text` | `jsonb -> text` |
+| `jsonb_slice_get(jsonb, integer)` | `jsonb ~> integer` | `jsonb -> integer` |
+| `jsonb_slice_get_text(jsonb, text)` | `jsonb ~>> text` | `jsonb ->> text` |
+| `jsonb_slice_get_text(jsonb, integer)` | `jsonb ~>> integer` | `jsonb ->> integer` |
+| `jsonb_slice_path(jsonb, text[])` | `jsonb ~#> text[]` | `jsonb #> text[]` |
+| `jsonb_slice_path_text(jsonb, text[])` | `jsonb ~#>> text[]` | `jsonb #>> text[]` |
+
+## What 0.4.0 contains
+
+- six accessor signatures for key, index, and path reads;
+- six operator signatures that call those accessors;
+- partial traversal through nested objects and arrays;
+- a complete-value fallback for unsupported storage forms;
+- fresh-install and 0.3.0 upgrade scripts;
+- focused regression tests for functions, operators, storage, and upgrades;
 - versioned documentation and release automation.
 
 ## Current limits
 
-- The function accepts a top-level text key only.
 - The partial path requires an external, uncompressed JSONB value.
-- The function can read the complete selected field value.
+- Each visited object lookup reads that object's key bytes.
+- The final selected value is read completely.
 - The release has no benchmark result or production support promise.
 
 !!! warning "Experimental work"
     Install this version only in a test database. This release makes no
-    performance claim.
+    general performance claim.
 
-[Install 0.3.0](getting-started.md){ .md-button .md-button--primary }
-[Read the problem](problem.md){ .md-button .md-button--primary }
+[Install 0.4.0](getting-started.md){ .md-button .md-button--primary }
+[Read the 0.4.0 notes](releases/0.4.0.md){ .md-button .md-button--primary }

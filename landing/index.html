@@ -25,8 +25,9 @@
         <p class="eyebrow">PostgreSQL extension research</p>
         <h1>One field.<br><em>Clear semantics.</em></h1>
         <p class="lede">
-          Version 0.3.0 reads selected data from an external, uncompressed
-          JSONB value. The result rules match PostgreSQL's text-key accessor.
+          Version 0.4.0 reads keys, array indexes, and nested paths from an
+          external, uncompressed JSONB value. The result rules match
+          PostgreSQL's JSONB accessors.
         </p>
         <div class="actions">
           @@LATEST_ACTION@@
@@ -34,13 +35,13 @@
         </div>
       </div>
 
-      <div class="read-path" aria-label="Read path in version 0.3.0">
-        <p class="diagram-label">0.3.0 accessor path</p>
+      <div class="read-path" aria-label="Read path in version 0.4.0">
+        <p class="diagram-label">0.4.0 accessor path</p>
         <ol>
-          <li><span>01</span><strong>Read</strong><small>Root header and directory</small></li>
-          <li><span>02</span><strong>Find</strong><small>Binary search on object keys</small></li>
-          <li><span>03</span><strong>Fetch</strong><small>Selected value bytes</small></li>
-          <li><span>04</span><strong>Return</strong><small>JSONB field value</small></li>
+          <li><span>01</span><strong>Read</strong><small>Container header and directory</small></li>
+          <li><span>02</span><strong>Find</strong><small>Object key or array index</small></li>
+          <li><span>03</span><strong>Follow</strong><small>Next path container</small></li>
+          <li><span>04</span><strong>Fetch</strong><small>Selected JSONB or text value</small></li>
         </ol>
       </div>
     </section>
@@ -48,10 +49,11 @@
     <section class="premise" aria-labelledby="premise-title">
       <p class="section-number">01 / Current release</p>
       <div>
-        <h2 id="premise-title">Version 0.3.0 adds the partial read path.</h2>
+        <h2 id="premise-title">Version 0.4.0 adds accessors and operators.</h2>
         <p>
-          The function uses TOAST slices for external, uncompressed input. It
-          uses the normal complete-value path for other storage forms.
+          The extension reads a key, an array index, or a nested path. It uses
+          TOAST slices for external, uncompressed input and PostgreSQL's
+          complete-value functions for other storage forms.
         </p>
       </div>
     </section>
@@ -74,8 +76,8 @@
       <div>
         <h2 id="notice-title">An experiment, not a production promise.</h2>
         <p>
-          Version 0.3.0 tests the total length of its slice requests. The
-          release makes no general performance claim.
+          Version 0.4.0 checks requested slice sizes in selected regression
+          fixtures. The release makes no general performance claim.
         </p>
       </div>
     </section>
