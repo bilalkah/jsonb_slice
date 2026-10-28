@@ -196,6 +196,13 @@ def main() -> int:
         raise ValueError("--output must be a child directory of the repository")
     plan = read_plan(root)
     known_versions = {entry["version"] for entry in plan["releases"]}
+    worktree_version = None
+    if args.include_worktree:
+        worktree_version = (root / "VERSION").read_text(encoding="utf-8").strip()
+        if worktree_version not in known_versions:
+            raise ValueError(
+                f"worktree version is missing from release-plan.json: {worktree_version}"
+            )
     found_tags = tags(root)
     unknown = sorted(set(found_tags) - known_versions)
     if unknown:
@@ -203,7 +210,9 @@ def main() -> int:
     missing_tags = [
         entry["version"]
         for entry in plan["releases"]
-        if entry["state"] == "released" and entry["version"] not in found_tags
+        if entry["state"] == "released"
+        and entry["version"] not in found_tags
+        and entry["version"] != worktree_version
     ]
     if missing_tags:
         raise ValueError(f"released versions have no tag: {missing_tags}")
@@ -223,12 +232,10 @@ def main() -> int:
             build_docs(source, output / version, version)
             built.add(version)
 
-    if args.include_worktree:
-        version = (root / "VERSION").read_text(encoding="utf-8").strip()
-        if version not in found_tags:
-            build_docs(root, output / version, version)
-            built.add(version)
-            preview.add(version)
+    if worktree_version is not None and worktree_version not in found_tags:
+        build_docs(root, output / worktree_version, worktree_version)
+        built.add(worktree_version)
+        preview.add(worktree_version)
 
     build_landing(root, output, plan, built, preview)
     write_version_index(root, output, plan, built)
