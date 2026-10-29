@@ -29,6 +29,8 @@ REGRESS = \
 	planner_config \
 	function_validation \
 	relation_eligibility \
+	transparent_text_key \
+	transparent_accessors \
 	storage_fallback \
 	upgrade
 REGRESS_OPTS = --inputdir=test
