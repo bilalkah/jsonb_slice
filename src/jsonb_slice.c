@@ -35,8 +35,15 @@
 #include "utils/jsonb.h"
 
 #include "jsonb_slice_core.h"
+#include "jsonb_slice_plan.h"
 
 PG_MODULE_MAGIC;
+
+void
+_PG_init(void)
+{
+	jsonb_slice_plan_init();
+}
 
 PG_FUNCTION_INFO_V1(jsonb_slice_get);
 PG_FUNCTION_INFO_V1(jsonb_slice_get_index);
@@ -45,9 +52,66 @@ PG_FUNCTION_INFO_V1(jsonb_slice_get_text_index);
 PG_FUNCTION_INFO_V1(jsonb_slice_path);
 PG_FUNCTION_INFO_V1(jsonb_slice_path_text);
 PG_FUNCTION_INFO_V1(jsonb_slice_test_fetched_bytes);
+PG_FUNCTION_INFO_V1(jsonb_slice_test_function_state);
+PG_FUNCTION_INFO_V1(jsonb_slice_test_statement_eligible);
+PG_FUNCTION_INFO_V1(jsonb_slice_test_plan_stats);
+PG_FUNCTION_INFO_V1(jsonb_slice_test_plan_stats_reset);
 
 /* Last successful sliced call in this backend; exposed only to the tests. */
 static int64 last_fetched_bytes = -1;
+
+/*
+ * Expose only stable validation counts to regression tests.  The planner
+ * module owns the catalog cache; this SQL entry point only formats its three
+ * answers and never exposes database-specific function OIDs.
+ */
+Datum
+jsonb_slice_test_function_state(PG_FUNCTION_ARGS)
+{
+	char *state;
+	text *result;
+	int validated_count;
+	int replacement_public_count;
+	int builtin_public_count;
+
+	jsonb_slice_plan_test_function_state(
+		&validated_count, &replacement_public_count, &builtin_public_count);
+	state = psprintf("%d:%d:%d", validated_count, replacement_public_count,
+					 builtin_public_count);
+	result = cstring_to_text(state);
+	pfree(state);
+	PG_RETURN_TEXT_P(result);
+}
+
+/* Expose the current statement's relation-gate result to regression tests. */
+Datum
+jsonb_slice_test_statement_eligible(PG_FUNCTION_ARGS)
+{
+	PG_RETURN_BOOL(jsonb_slice_plan_test_statement_eligible());
+}
+
+/* Return stable planner-rewrite counts without exposing plan-node details. */
+Datum
+jsonb_slice_test_plan_stats(PG_FUNCTION_ARGS)
+{
+	char *state;
+	text *result;
+	int64 plan_count;
+	int64 call_count;
+
+	jsonb_slice_plan_test_stats(&plan_count, &call_count);
+	state = psprintf(INT64_FORMAT ":" INT64_FORMAT, plan_count, call_count);
+	result = cstring_to_text(state);
+	pfree(state);
+	PG_RETURN_TEXT_P(result);
+}
+
+Datum
+jsonb_slice_test_plan_stats_reset(PG_FUNCTION_ARGS)
+{
+	jsonb_slice_plan_test_stats_reset();
+	PG_RETURN_BOOL(true);
+}
 
 /* Detoast the complete value and perform the JSONB-returning key lookup. */
 static Datum

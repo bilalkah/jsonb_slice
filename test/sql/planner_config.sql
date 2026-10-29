@@ -1,0 +1,74 @@
+-- The library creates the user setting before any query uses the hook.
+LOAD 'jsonb_slice';
+
+COPY (
+	SELECT name || ':' || setting || ':' || boot_val || ':' || vartype || ':' ||
+		   context
+	FROM pg_settings
+	WHERE name = 'jsonb_slice.transparent'
+	ORDER BY name
+) TO STDOUT;
+
+-- A query without a table is not eligible, under either setting value.
+SET jsonb_slice.transparent = off;
+COPY (
+	SELECT ('{"field": "value"}'::jsonb ->> 'field') || ':' ||
+		   ('[10, 20, 30]'::jsonb -> 1)::text || ':' ||
+		   ('{"a": {"b": 2}}'::jsonb #>> ARRAY['a', 'b'])
+) TO STDOUT;
+
+SET jsonb_slice.transparent = on;
+COPY (
+	SELECT ('{"field": "value"}'::jsonb ->> 'field') || ':' ||
+		   ('[10, 20, 30]'::jsonb -> 1)::text || ':' ||
+		   ('{"a": {"b": 2}}'::jsonb #>> ARRAY['a', 'b'])
+) TO STDOUT;
+
+-- A changed extension setting must discard a prepared generic plan.  An
+-- assignment of the current value must leave that plan in place.
+CREATE TABLE planner_config_probe (id integer, payload text);
+INSERT INTO planner_config_probe
+SELECT number, repeat(chr(120), 20)
+FROM generate_series(1, 3) AS number;
+CREATE INDEX planner_config_probe_id_idx ON planner_config_probe (id);
+ANALYZE planner_config_probe;
+
+SET plan_cache_mode = force_generic_plan;
+SET enable_seqscan = off;
+SET jsonb_slice.transparent = off;
+PREPARE planner_config_query(integer) AS
+	SELECT payload FROM planner_config_probe WHERE id = $1;
+
+CREATE FUNCTION planner_config_plan_node()
+RETURNS text
+LANGUAGE plpgsql
+AS $$
+DECLARE
+	plan json;
+BEGIN
+	EXECUTE
+		'EXPLAIN (FORMAT JSON, COSTS OFF) EXECUTE planner_config_query(2)'
+		INTO plan;
+	RETURN plan -> 0 -> 'Plan' ->> 'Node Type';
+END;
+$$;
+
+COPY (SELECT planner_config_plan_node()) TO STDOUT;
+
+-- enable_seqscan does not discard the existing generic plan.  Assigning the
+-- current transparent value must not discard it either.
+SET enable_seqscan = on;
+SET jsonb_slice.transparent = off;
+COPY (SELECT planner_config_plan_node()) TO STDOUT;
+
+-- Changing transparent discards the old plan, so the new plan can use the
+-- current enable_seqscan value.
+SET jsonb_slice.transparent = on;
+COPY (SELECT planner_config_plan_node()) TO STDOUT;
+
+DEALLOCATE planner_config_query;
+RESET plan_cache_mode;
+RESET enable_seqscan;
+RESET jsonb_slice.transparent;
+DROP FUNCTION planner_config_plan_node();
+DROP TABLE planner_config_probe;

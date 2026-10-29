@@ -1,0 +1,81 @@
+-- This test-only function reports:
+-- validated replacements:PUBLIC replacements:PUBLIC built-ins.
+LOAD 'jsonb_slice';
+CREATE FUNCTION jsonb_slice_test_function_state()
+RETURNS text
+AS '$libdir/jsonb_slice', 'jsonb_slice_test_function_state'
+LANGUAGE C;
+
+-- A loaded library is quiet when this database has no extension.
+COPY (
+	SELECT 'extension absent:' || jsonb_slice_test_function_state()
+) TO STDOUT;
+
+-- An exact C function with the expected name and properties is still not a
+-- replacement when it is not owned by the extension.
+CREATE FUNCTION jsonb_slice_get(jsonb, text)
+RETURNS jsonb
+AS '$libdir/jsonb_slice', 'jsonb_slice_get'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
+
+COPY (
+	SELECT 'same name only:' || jsonb_slice_test_function_state()
+) TO STDOUT;
+
+-- Lookup follows the extension schema instead of search_path or a same-name
+-- function in public.
+CREATE SCHEMA function_validation_extension;
+CREATE EXTENSION jsonb_slice SCHEMA function_validation_extension;
+
+COPY (
+	SELECT 'relocated extension:' || jsonb_slice_test_function_state()
+) TO STDOUT;
+
+-- A changed property makes only that replacement invalid.
+ALTER FUNCTION function_validation_extension.jsonb_slice_get(jsonb, text)
+	VOLATILE;
+COPY (
+	SELECT 'altered replacement:' || jsonb_slice_test_function_state()
+) TO STDOUT;
+
+ALTER FUNCTION function_validation_extension.jsonb_slice_get(jsonb, text)
+	IMMUTABLE;
+COPY (
+	SELECT 'restored replacement:' || jsonb_slice_test_function_state()
+) TO STDOUT;
+
+-- Replacement privileges and built-in privileges are separate decisions.
+REVOKE EXECUTE ON FUNCTION
+	function_validation_extension.jsonb_slice_get(jsonb, text) FROM PUBLIC;
+COPY (
+	SELECT 'replacement revoked:' || jsonb_slice_test_function_state()
+) TO STDOUT;
+
+GRANT EXECUTE ON FUNCTION
+	function_validation_extension.jsonb_slice_get(jsonb, text) TO PUBLIC;
+COPY (
+	SELECT 'replacement granted:' || jsonb_slice_test_function_state()
+) TO STDOUT;
+
+REVOKE EXECUTE ON FUNCTION pg_catalog.jsonb_object_field(jsonb, text)
+	FROM PUBLIC;
+COPY (
+	SELECT 'built-in revoked:' || jsonb_slice_test_function_state()
+) TO STDOUT;
+
+GRANT EXECUTE ON FUNCTION pg_catalog.jsonb_object_field(jsonb, text)
+	TO PUBLIC;
+COPY (
+	SELECT 'built-in granted:' || jsonb_slice_test_function_state()
+) TO STDOUT;
+
+-- Dropping the extension invalidates the cached OIDs.  The same-name public
+-- function must not become a replacement.
+DROP EXTENSION jsonb_slice;
+COPY (
+	SELECT 'extension dropped:' || jsonb_slice_test_function_state()
+) TO STDOUT;
+
+DROP SCHEMA function_validation_extension;
+DROP FUNCTION jsonb_slice_get(jsonb, text);
+DROP FUNCTION jsonb_slice_test_function_state();

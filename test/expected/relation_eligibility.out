@@ -1,0 +1,148 @@
+-- The test-only function returns the relation gate recorded while its own
+-- statement was planned.  It is not part of the extension SQL API.
+LOAD 'jsonb_slice';
+CREATE FUNCTION jsonb_slice_test_statement_eligible()
+RETURNS boolean
+AS '$libdir/jsonb_slice', 'jsonb_slice_test_statement_eligible'
+LANGUAGE C;
+-- A statement without a table has no eligible relation.
+COPY (
+	SELECT 'no table:' ||
+		CASE WHEN jsonb_slice_test_statement_eligible()
+			 THEN 'eligible' ELSE 'not eligible' END
+) TO STDOUT;
+no table:not eligible
+CREATE TABLE relation_external (id integer, document jsonb);
+ALTER TABLE relation_external ALTER COLUMN document SET STORAGE EXTERNAL;
+INSERT INTO relation_external VALUES (1, '{"name": "external"}');
+COPY (
+	SELECT 'ordinary external:' ||
+		CASE WHEN jsonb_slice_test_statement_eligible()
+			 THEN 'eligible' ELSE 'not eligible' END
+	FROM relation_external
+	LIMIT 1
+) TO STDOUT;
+ordinary external:eligible
+CREATE TABLE relation_default (id integer, document jsonb);
+INSERT INTO relation_default VALUES (1, '{"name": "default"}');
+COPY (
+	SELECT 'ordinary default:' ||
+		CASE WHEN jsonb_slice_test_statement_eligible()
+			 THEN 'eligible' ELSE 'not eligible' END
+	FROM relation_default
+	LIMIT 1
+) TO STDOUT;
+ordinary default:not eligible
+-- One eligible relation opens the statement-wide gate.
+COPY (
+	SELECT 'mixed relations:' ||
+		CASE WHEN jsonb_slice_test_statement_eligible()
+			 THEN 'eligible' ELSE 'not eligible' END
+	FROM relation_external
+	CROSS JOIN relation_default
+	LIMIT 1
+) TO STDOUT;
+mixed relations:eligible
+CREATE DOMAIN relation_jsonb_domain AS jsonb;
+CREATE TABLE relation_domain (id integer, document relation_jsonb_domain);
+ALTER TABLE relation_domain ALTER COLUMN document SET STORAGE EXTERNAL;
+INSERT INTO relation_domain VALUES (1, '{"name": "domain"}');
+COPY (
+	SELECT 'domain over jsonb:' ||
+		CASE WHEN jsonb_slice_test_statement_eligible()
+			 THEN 'eligible' ELSE 'not eligible' END
+	FROM relation_domain
+	LIMIT 1
+) TO STDOUT;
+domain over jsonb:eligible
+CREATE TABLE relation_partitioned (id integer, document jsonb)
+PARTITION BY RANGE (id);
+ALTER TABLE relation_partitioned ALTER COLUMN document SET STORAGE EXTERNAL;
+CREATE TABLE relation_partition
+PARTITION OF relation_partitioned FOR VALUES FROM (0) TO (10);
+INSERT INTO relation_partitioned VALUES (1, '{"name": "partition"}');
+COPY (
+	SELECT 'partitioned table:' ||
+		CASE WHEN jsonb_slice_test_statement_eligible()
+			 THEN 'eligible' ELSE 'not eligible' END
+	FROM relation_partitioned
+	LIMIT 1
+) TO STDOUT;
+partitioned table:eligible
+CREATE MATERIALIZED VIEW relation_materialized AS
+SELECT 1 AS id, '{"name": "materialized"}'::jsonb AS document;
+ALTER MATERIALIZED VIEW relation_materialized
+	ALTER COLUMN document SET STORAGE EXTERNAL;
+COPY (
+	SELECT 'materialized view:' ||
+		CASE WHEN jsonb_slice_test_statement_eligible()
+			 THEN 'eligible' ELSE 'not eligible' END
+	FROM relation_materialized
+	LIMIT 1
+) TO STDOUT;
+materialized view:eligible
+-- A normal view with no eligible base relation does not open the gate.
+CREATE VIEW relation_literal_view AS
+SELECT '{"name": "view"}'::jsonb AS document;
+COPY (
+	SELECT 'literal view:' ||
+		CASE WHEN jsonb_slice_test_statement_eligible()
+			 THEN 'eligible' ELSE 'not eligible' END
+	FROM relation_literal_view
+) TO STDOUT;
+literal view:not eligible
+-- A dropped external JSONB column no longer counts.
+CREATE TABLE relation_dropped (document jsonb, marker integer);
+ALTER TABLE relation_dropped ALTER COLUMN document SET STORAGE EXTERNAL;
+ALTER TABLE relation_dropped DROP COLUMN document;
+INSERT INTO relation_dropped VALUES (1);
+COPY (
+	SELECT 'dropped column:' ||
+		CASE WHEN jsonb_slice_test_statement_eligible()
+			 THEN 'eligible' ELSE 'not eligible' END
+	FROM relation_dropped
+	LIMIT 1
+) TO STDOUT;
+dropped column:not eligible
+-- The first query caches false.  Each ALTER invalidates that relation entry,
+-- so the following plans see true and then false without reconnecting.
+CREATE TABLE relation_storage_change (id integer, document jsonb);
+INSERT INTO relation_storage_change VALUES (1, '{"name": "change"}');
+COPY (
+	SELECT 'storage before:' ||
+		CASE WHEN jsonb_slice_test_statement_eligible()
+			 THEN 'eligible' ELSE 'not eligible' END
+	FROM relation_storage_change
+	LIMIT 1
+) TO STDOUT;
+storage before:not eligible
+ALTER TABLE relation_storage_change
+	ALTER COLUMN document SET STORAGE EXTERNAL;
+COPY (
+	SELECT 'storage external:' ||
+		CASE WHEN jsonb_slice_test_statement_eligible()
+			 THEN 'eligible' ELSE 'not eligible' END
+	FROM relation_storage_change
+	LIMIT 1
+) TO STDOUT;
+storage external:eligible
+ALTER TABLE relation_storage_change
+	ALTER COLUMN document SET STORAGE EXTENDED;
+COPY (
+	SELECT 'storage extended:' ||
+		CASE WHEN jsonb_slice_test_statement_eligible()
+			 THEN 'eligible' ELSE 'not eligible' END
+	FROM relation_storage_change
+	LIMIT 1
+) TO STDOUT;
+storage extended:not eligible
+DROP VIEW relation_literal_view;
+DROP MATERIALIZED VIEW relation_materialized;
+DROP TABLE relation_partitioned;
+DROP TABLE relation_domain;
+DROP DOMAIN relation_jsonb_domain;
+DROP TABLE relation_storage_change;
+DROP TABLE relation_dropped;
+DROP TABLE relation_default;
+DROP TABLE relation_external;
+DROP FUNCTION jsonb_slice_test_statement_eligible();

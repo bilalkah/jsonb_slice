@@ -2,7 +2,11 @@ EXTENSION = jsonb_slice
 MODULE_big = jsonb_slice
 OBJS = \
 	src/jsonb_slice.o \
-	src/jsonb_slice_core.o
+	src/jsonb_slice_core.o \
+	src/jsonb_slice_plan.o \
+	src/jsonb_slice_plan_functions.o \
+	src/jsonb_slice_plan_relations.o \
+	src/jsonb_slice_plan_walk.o
 
 DATA = \
 	sql/jsonb_slice--0.1.0.sql \
@@ -22,6 +26,9 @@ REGRESS = \
 	get_path \
 	get_path_text \
 	operators \
+	planner_config \
+	function_validation \
+	relation_eligibility \
 	storage_fallback \
 	upgrade
 REGRESS_OPTS = --inputdir=test
