@@ -1,0 +1,104 @@
+-- Transparent mode changes the called accessor.  The accessor still selects
+-- the sliced or complete-value path from the actual stored value.
+LOAD 'jsonb_slice';
+CREATE EXTENSION jsonb_slice;
+
+CREATE FUNCTION jsonb_slice_test_fetched_bytes()
+RETURNS bigint
+AS '$libdir/jsonb_slice', 'jsonb_slice_test_fetched_bytes'
+LANGUAGE C;
+CREATE FUNCTION jsonb_slice_test_plan_stats()
+RETURNS text
+AS '$libdir/jsonb_slice', 'jsonb_slice_test_plan_stats'
+LANGUAGE C;
+CREATE FUNCTION jsonb_slice_test_plan_stats_reset()
+RETURNS boolean
+AS '$libdir/jsonb_slice', 'jsonb_slice_test_plan_stats_reset'
+LANGUAGE C;
+
+CREATE TABLE transparent_storage_document (id integer, document jsonb);
+
+-- This row is compressed under the default storage strategy.  Changing the
+-- declaration later does not rewrite the existing value.
+INSERT INTO transparent_storage_document VALUES
+	(1, jsonb_build_object('field', 'compressed',
+							  'padding', repeat('z', 24000)));
+
+ALTER TABLE transparent_storage_document
+	ALTER COLUMN document SET STORAGE EXTERNAL;
+
+-- The small value remains inline.  The large value is external and is not
+-- compressed because the column now uses EXTERNAL storage.
+INSERT INTO transparent_storage_document VALUES
+	(2, '{"field": "inline"}'::jsonb),
+	(3, jsonb_build_object('field', 'external',
+							  'padding', repeat('x', 24000)));
+
+SET max_parallel_workers_per_gather = 0;
+SET jsonb_slice.transparent = on;
+
+-- The old compressed row is eligible at the table level, but the accessor
+-- sees its actual representation and uses PostgreSQL's complete-value path.
+COPY (SELECT jsonb_slice_test_plan_stats_reset()) TO STDOUT;
+COPY
+(
+	SELECT pg_column_size(document) < 2000 AND
+		   document ->> 'field' = 'compressed'
+	FROM transparent_storage_document
+	WHERE id = 1
+) TO STDOUT;
+COPY (SELECT jsonb_slice_test_fetched_bytes() IS NULL) TO STDOUT;
+COPY (SELECT jsonb_slice_test_plan_stats()) TO STDOUT;
+
+-- The same replacement uses the complete-value path for an inline value.
+COPY (SELECT jsonb_slice_test_plan_stats_reset()) TO STDOUT;
+COPY
+(
+	SELECT pg_column_size(document) < 2000 AND
+		   document ->> 'field' = 'inline'
+	FROM transparent_storage_document
+	WHERE id = 2
+) TO STDOUT;
+COPY (SELECT jsonb_slice_test_fetched_bytes() IS NULL) TO STDOUT;
+COPY (SELECT jsonb_slice_test_plan_stats()) TO STDOUT;
+
+-- The external, uncompressed row uses TOAST slices and reads fewer requested
+-- bytes than the complete stored value.
+COPY (SELECT jsonb_slice_test_plan_stats_reset()) TO STDOUT;
+COPY
+(
+	SELECT document ->> 'field' = 'external'
+	FROM transparent_storage_document
+	WHERE id = 3
+) TO STDOUT;
+COPY
+(
+	SELECT jsonb_slice_test_fetched_bytes() > 0 AND
+		   jsonb_slice_test_fetched_bytes() < pg_column_size(document)
+	FROM transparent_storage_document
+	WHERE id = 3
+) TO STDOUT;
+COPY (SELECT jsonb_slice_test_plan_stats()) TO STDOUT;
+
+-- LIMIT owns this parameter expression outside the supported walker fields.
+-- PostgreSQL keeps the built-in call, and the query result remains correct.
+SET plan_cache_mode = force_generic_plan;
+PREPARE transparent_limit(jsonb) AS
+	SELECT id
+	FROM transparent_storage_document
+	ORDER BY id
+	LIMIT (($1 ->> 'count')::integer);
+COPY (SELECT jsonb_slice_test_plan_stats_reset()) TO STDOUT;
+\pset format unaligned
+EXECUTE transparent_limit('{"count": 1}'::jsonb);
+\pset format aligned
+COPY (SELECT jsonb_slice_test_plan_stats()) TO STDOUT;
+DEALLOCATE transparent_limit;
+
+RESET plan_cache_mode;
+RESET jsonb_slice.transparent;
+DROP TABLE transparent_storage_document;
+DROP FUNCTION jsonb_slice_test_plan_stats_reset();
+DROP FUNCTION jsonb_slice_test_plan_stats();
+DROP FUNCTION jsonb_slice_test_fetched_bytes();
+DROP EXTENSION jsonb_slice;

@@ -31,6 +31,8 @@ REGRESS = \
 	relation_eligibility \
 	transparent_text_key \
 	transparent_accessors \
+	transparent_storage \
+	plan_walker_common \
 	storage_fallback \
 	upgrade
 REGRESS_OPTS = --inputdir=test
