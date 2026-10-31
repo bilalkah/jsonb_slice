@@ -13,9 +13,11 @@ DATA = \
 	sql/jsonb_slice--0.2.0.sql \
 	sql/jsonb_slice--0.3.0.sql \
 	sql/jsonb_slice--0.4.0.sql \
+	sql/jsonb_slice--0.5.0.sql \
 	sql/jsonb_slice--0.1.0--0.2.0.sql \
 	sql/jsonb_slice--0.2.0--0.3.0.sql \
-	sql/jsonb_slice--0.3.0--0.4.0.sql
+	sql/jsonb_slice--0.3.0--0.4.0.sql \
+	sql/jsonb_slice--0.4.0--0.5.0.sql
 
 REGRESS = \
 	install \

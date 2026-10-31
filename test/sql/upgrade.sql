@@ -43,4 +43,13 @@ COPY (
     WHERE extname = 'jsonb_slice'
 ) TO STDOUT;
 
+ALTER EXTENSION jsonb_slice UPDATE TO '0.5.0';
+
+COPY (
+    SELECT extversion || ':' ||
+           (obj_description(oid, 'pg_extension') LIKE '%transparent access%')
+    FROM pg_extension
+    WHERE extname = 'jsonb_slice'
+) TO STDOUT;
+
 DROP EXTENSION jsonb_slice;

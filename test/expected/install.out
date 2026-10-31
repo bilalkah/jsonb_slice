@@ -4,7 +4,7 @@ COPY (
     FROM pg_extension
     WHERE extname = 'jsonb_slice'
 ) TO STDOUT;
-jsonb_slice:0.4.0:true
+jsonb_slice:0.5.0:true
 COPY (
     SELECT p.provolatile::text || ':' || p.proisstrict::text || ':' ||
            p.proparallel::text

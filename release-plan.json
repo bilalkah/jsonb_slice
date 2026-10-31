@@ -1,5 +1,5 @@
 {
-  "current": "0.4.0",
+  "current": "0.5.0",
   "releases": [
     {
       "version": "0.1.0",
@@ -28,6 +28,13 @@
       "state": "released",
       "title": "Add JSONB accessors and operators",
       "summary": "This release adds key, index, and path accessors with JSONB and text results. It also adds matching operators."
+    },
+    {
+      "version": "0.5.0",
+      "sequence": 5,
+      "state": "released",
+      "title": "Add optional transparent access",
+      "summary": "This release can route built-in JSONB accessors through jsonb_slice in supported plan expressions when transparent mode is enabled."
     }
   ]
 }
