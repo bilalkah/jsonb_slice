@@ -208,3 +208,49 @@ enters a nested object or array.
 The call to a PostgreSQL JSONB function when the extension cannot safely use
 TOAST slices. Inline input, compressed input, an empty path, or invalid storage
 metadata can select this path.
+
+## Planner terms
+
+### planner hook
+
+A PostgreSQL function pointer that lets an extension wrap normal planning.
+`jsonb_slice` calls the previous hook or PostgreSQL's standard planner first.
+It then inspects the completed plan.
+
+### `Query`
+
+PostgreSQL's analyzed representation of a statement before planning.
+Transparent mode does not change this structure.
+
+### `PlannedStmt`
+
+The top-level executable plan returned by the planner. It owns the main plan
+tree, subplans, range-table entries, and invalidation dependencies.
+
+### `OpExpr`
+
+An expression written with an SQL operator. It stores the operator OID in
+`opno` and the executable function OID in `opfuncid`. Transparent mode keeps
+`opno` and can replace `opfuncid`.
+
+### `FuncExpr`
+
+A direct SQL function call in an expression tree. Its `funcid` field identifies
+the executable function.
+
+### copy-on-write plan traversal
+
+A traversal that returns the original plan node when nothing changes. When a
+field changes, it copies the complete concrete node and updates the copy. This
+avoids modifying a plan returned by PostgreSQL or another extension hook.
+
+### transparent mode
+
+The optional `jsonb_slice.transparent` setting. When it is on, supported
+built-in JSONB accessor calls can use validated extension functions. The mode
+is off by default.
+
+### plan invalidation dependency
+
+A catalog dependency stored in a planned statement. A relevant function or
+permission change invalidates the cached plan so PostgreSQL can plan it again.

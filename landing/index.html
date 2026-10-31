@@ -25,9 +25,9 @@
         <p class="eyebrow">PostgreSQL extension research</p>
         <h1>One field.<br><em>Clear semantics.</em></h1>
         <p class="lede">
-          Version 0.4.0 reads keys, array indexes, and nested paths from an
-          external, uncompressed JSONB value. The result rules match
-          PostgreSQL's JSONB accessors.
+          Version 0.5.0 can route built-in JSONB accessors through the
+          extension in supported plan expressions. External, uncompressed
+          values can use TOAST slices.
         </p>
         <div class="actions">
           @@LATEST_ACTION@@
@@ -35,13 +35,13 @@
         </div>
       </div>
 
-      <div class="read-path" aria-label="Read path in version 0.4.0">
-        <p class="diagram-label">0.4.0 accessor path</p>
+      <div class="read-path" aria-label="Read path in version 0.5.0">
+        <p class="diagram-label">0.5.0 transparent path</p>
         <ol>
-          <li><span>01</span><strong>Read</strong><small>Container header and directory</small></li>
-          <li><span>02</span><strong>Find</strong><small>Object key or array index</small></li>
-          <li><span>03</span><strong>Follow</strong><small>Next path container</small></li>
-          <li><span>04</span><strong>Fetch</strong><small>Selected JSONB or text value</small></li>
+          <li><span>01</span><strong>Plan</strong><small>Keep PostgreSQL's selected plan</small></li>
+          <li><span>02</span><strong>Check</strong><small>Validate relation and function safety</small></li>
+          <li><span>03</span><strong>Route</strong><small>Use the matching extension accessor</small></li>
+          <li><span>04</span><strong>Read</strong><small>Slice or use the complete-value fallback</small></li>
         </ol>
       </div>
     </section>
@@ -49,11 +49,11 @@
     <section class="premise" aria-labelledby="premise-title">
       <p class="section-number">01 / Current release</p>
       <div>
-        <h2 id="premise-title">Version 0.4.0 adds accessors and operators.</h2>
+        <h2 id="premise-title">Version 0.5.0 adds optional transparent access.</h2>
         <p>
-          The extension reads a key, an array index, or a nested path. It uses
-          TOAST slices for external, uncompressed input and PostgreSQL's
-          complete-value functions for other storage forms.
+          The mode is off by default. Supported built-in accessor expressions
+          can use jsonb_slice without changing the SQL text. Other expressions
+          keep PostgreSQL's built-in functions.
         </p>
       </div>
     </section>
@@ -76,7 +76,7 @@
       <div>
         <h2 id="notice-title">An experiment, not a production promise.</h2>
         <p>
-          Version 0.4.0 checks requested slice sizes in selected regression
+          Version 0.5.0 checks requested slice sizes in selected regression
           fixtures. The release makes no general performance claim.
         </p>
       </div>

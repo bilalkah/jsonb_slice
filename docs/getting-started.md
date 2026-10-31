@@ -1,7 +1,8 @@
-# Install 0.4.0
+# Install 0.5.0
 
-0.4.0 is a PostgreSQL C extension. It provides key, index, and path accessors
-with JSONB and text results.
+0.5.0 is a PostgreSQL C extension. It provides key, index, and path accessors
+with JSONB and text results. It also provides an optional transparent mode for
+supported built-in accessor expressions.
 
 ## Requirements
 
@@ -39,18 +40,19 @@ FROM pg_extension
 WHERE extname = 'jsonb_slice';
 ```
 
-The version must be `0.4.0`. The extension is relocatable.
+The version must be `0.5.0`. The extension is relocatable.
 
-## Upgrade from 0.3.0
+## Upgrade from 0.4.0
 
-Install the 0.4.0 files. Then run:
+Install the 0.5.0 files. Then run:
 
 ```sql
-ALTER EXTENSION jsonb_slice UPDATE TO '0.4.0';
+ALTER EXTENSION jsonb_slice UPDATE TO '0.5.0';
 ```
 
-The upgrade adds the new function signatures and operators. It does not change
-stored JSONB values.
+The upgrade keeps the existing function and operator signatures. It updates
+the extension version and makes the new library behavior available. It does
+not change stored JSONB values.
 
 ## Read by key
 
@@ -112,6 +114,60 @@ SELECT '{"users": [{"name": "Ada"}]}'::jsonb
 The `~>` and `~#>` operators return JSONB. The `~>>` and `~#>>` operators
 return SQL text.
 
+## Enable transparent mode
+
+The planner hook must be loaded before PostgreSQL plans the query. Load it in
+the current session, and then enable transparent mode:
+
+```sql
+LOAD 'jsonb_slice';
+SET jsonb_slice.transparent = on;
+```
+
+Existing built-in syntax can then use the matching extension accessor in a
+supported plan expression:
+
+```sql
+SELECT document -> 'profile',
+       document ->> 'name',
+       document #>> ARRAY['profile', 'role']
+FROM records;
+```
+
+The setting is off by default. Reset it with:
+
+```sql
+RESET jsonb_slice.transparent;
+```
+
+To load the library for each new session, set this PostgreSQL configuration:
+
+```conf
+session_preload_libraries = 'jsonb_slice'
+```
+
+Start a new session after the configuration change. `CREATE EXTENSION` alone
+does not load the planner hook in every session.
+
+### Transparent-mode scope
+
+The mode inspects accessors in:
+
+- common select lists;
+- ordinary filters;
+- common left and right child plans;
+- append-style child plans;
+- scalar and other planned subplans.
+
+If an accessor is stored in another plan-specific field, PostgreSQL keeps the
+built-in function. The query result does not change. The call only misses the
+partial-read opportunity.
+
+A statement is considered only when it reads a normal table, partitioned
+table, or materialized view with a JSONB column declared as `STORAGE
+EXTERNAL`. The stored value still controls execution. Inline and compressed
+values use PostgreSQL's complete-value path.
+
 ## Result rules
 
 - A missing key, index, or path returns SQL `NULL`.
@@ -131,12 +187,12 @@ make installcheck PG_CONFIG=/path/to/pg_config
 ```
 
 The tests check a fresh installation, all six accessor signatures, all six
-operator signatures, storage fallbacks, extension removal, and upgrades from
-0.1.0 through 0.4.0.
+operator signatures, transparent replacement, storage fallbacks, extension
+removal, and upgrades from 0.1.0 through 0.5.0.
 
 ## Current boundary
 
-0.4.0 uses TOAST slices for an external, uncompressed JSONB value. It reads
+0.5.0 uses TOAST slices for an external, uncompressed JSONB value. It reads
 the directory of each visited container, the required object key bytes, and
 the final selected value. Inline or compressed input uses PostgreSQL's
 complete-value functions. This release makes no general performance claim.
